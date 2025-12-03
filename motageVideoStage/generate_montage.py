@@ -27,9 +27,9 @@ def generate_montage_video():
     image_paths, audio_path = create_dummy_assets()
     
     subtitles = [
-        (0, 2, "Start Red"),
-        (2, 4, "Middle Green"),
-        (4, 6, "End Blue")
+        (0, 2, "This is a test audio"),
+        (2, 4, "for the video"),
+        (4, 6, "montage.")
     ]
     
     # Ensure output directory exists
