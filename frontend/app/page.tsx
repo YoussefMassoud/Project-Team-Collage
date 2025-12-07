@@ -16,15 +16,19 @@ export default function Home() {
     try {
       // 1. Fetch Post Data
       const postRes = await fetchPost(url);
-      if (postRes.success) {
-        localStorage.setItem('currentPost', JSON.stringify(postRes.data));
+
+      // Check if we got a valid post object (checking for a key like 'text' or 'post_id')
+      if (postRes && !postRes.message) {
+        localStorage.setItem('currentPost', JSON.stringify(postRes));
 
         // 2. Analyze Post
-        const analysisRes = await analyzePost(postRes.data);
+        const analysisRes = await analyzePost(postRes);
         localStorage.setItem('currentAnalysis', JSON.stringify(analysisRes));
 
         // 3. Redirect
         router.push('/dashboard');
+      } else {
+        alert("Failed to fetch post: " + (postRes.message || "Unknown error"));
       }
     } catch (error) {
       console.error("Error:", error);
