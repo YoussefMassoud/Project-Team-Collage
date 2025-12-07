@@ -1,6 +1,6 @@
 const API_BASE = 'http://localhost:5000/api';
 
-export const fetchPost = async (url) => {
+export const fetchPost = async (url: string) => {
     const res = await fetch(`${API_BASE}/fetch-post`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -9,7 +9,7 @@ export const fetchPost = async (url) => {
     return res.json();
 };
 
-export const analyzePost = async (data) => {
+export const analyzePost = async (data: any) => {
     const res = await fetch(`${API_BASE}/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -18,11 +18,3 @@ export const analyzePost = async (data) => {
     return res.json();
 };
 
-export const predictPost = async (text) => {
-    const res = await fetch(`${API_BASE}/predict`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-    });
-    return res.json();
-};
