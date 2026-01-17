@@ -1,7 +1,7 @@
 "use client";
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart2, FileText, Home } from 'lucide-react';
+import { BarChart2, FileText, Home, CreditCard } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function Navbar() {
@@ -9,8 +9,10 @@ export default function Navbar() {
 
     const links = [
         { href: '/', label: 'Home', icon: Home },
+        { href: '/subscription', label: 'Plans', icon: CreditCard },
         { href: '/dashboard', label: 'Dashboard', icon: BarChart2 },
         { href: '/report', label: 'AI Report', icon: FileText },
+        
     ];
 
     return (
