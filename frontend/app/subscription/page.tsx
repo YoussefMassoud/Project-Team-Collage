@@ -181,6 +181,20 @@ export default function SubscriptionPage() {
           border-color: var(--primary) !important;
           box-shadow: 0 10px 40px rgba(124, 58, 237, 0.2) !important;
         }
+
+        @media (max-width: 768px) {
+          .grid-responsive {
+            grid-template-columns: 1fr;
+            padding: 0 10px;
+          }
+          h1 {
+            font-size: 2.2rem !important;
+          }
+          .glass-panel {
+            padding: 30px !important;
+            transform: scale(1) !important;
+          }
+        }
       `}</style>
     </div>
   );
