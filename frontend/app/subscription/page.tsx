@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from 'react';
-import { Check } from 'lucide-react';
+import { Check, MousePointerClick, FileText, MessageCircle, Trophy } from 'lucide-react';
 import SubscriptionDialog from '@/components/SubscriptionDialog';
 
 const plans = [
@@ -125,6 +125,44 @@ export default function SubscriptionPage() {
         ))}
       </div>
 
+      <div style={{ marginTop: '100px', textAlign: 'center', paddingBottom: '50px' }} className="animate-fade-in-up">
+        <h2 className="gradient-text" style={{ fontSize: '2.5rem', fontWeight: 'bold', marginBottom: '50px' }}>
+          Steps to Subscribe
+        </h2>
+        
+        <div className="flow-container">
+          <div className="flow-step">
+            <div className="icon-box"><MousePointerClick size={32} /></div>
+            <h3>1. Choose Plan</h3>
+            <p>Pick the best plan for your needs.</p>
+          </div>
+          
+          <div className="flow-connector"></div>
+          
+          <div className="flow-step">
+            <div className="icon-box"><FileText size={32} /></div>
+            <h3>2. Fill Info</h3>
+            <p>Enter your details in the form.</p>
+          </div>
+          
+          <div className="flow-connector"></div>
+          
+          <div className="flow-step">
+            <div className="icon-box"><MessageCircle size={32} /></div>
+            <h3>3. Send to Support</h3>
+            <p>Send the form via WhatsApp to our team.</p>
+          </div>
+          
+          <div className="flow-connector"></div>
+          
+          <div className="flow-step">
+            <div className="icon-box"><Trophy size={32} /></div>
+            <h3>4. Success!</h3>
+            <p>Congratulations! You are now subscribed.</p>
+          </div>
+        </div>
+      </div>
+
       <SubscriptionDialog 
         isOpen={!!selectedPlan} 
         onClose={() => setSelectedPlan(null)} 
@@ -138,6 +176,62 @@ export default function SubscriptionPage() {
           grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
           gap: 30px;
           align-items: center;
+        }
+
+        .flow-container {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 20px;
+          max-width: 1000px;
+          margin: 0 auto;
+        }
+
+        .flow-step {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 15px;
+        }
+
+        .icon-box {
+          width: 70px;
+          height: 70px;
+          background: var(--card-bg);
+          border: 1px solid var(--card-border);
+          border-radius: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: var(--primary);
+          transition: all 0.3s ease;
+        }
+
+        .flow-step:hover .icon-box {
+           background: var(--primary);
+           color: white;
+           transform: translateY(-5px);
+           box-shadow: 0 10px 20px rgba(124, 58, 237, 0.3);
+        }
+
+        .flow-step h3 {
+          font-size: 1.2rem;
+          font-weight: 600;
+          margin: 0;
+        }
+
+        .flow-step p {
+          font-size: 0.9rem;
+          opacity: 0.7;
+          line-height: 1.4;
+        }
+
+        .flow-connector {
+          flex: 0 0 40px;
+          height: 2px;
+          background: var(--card-border);
+          margin-top: 35px;
         }
 
         .animate-fade-in-down {
@@ -180,6 +274,19 @@ export default function SubscriptionPage() {
           transform: translateY(-10px) !important;
           border-color: var(--primary) !important;
           box-shadow: 0 10px 40px rgba(124, 58, 237, 0.2) !important;
+        }
+
+        @media (max-width: 850px) {
+          .flow-container {
+            flex-direction: column;
+            gap: 40px;
+            align-items: center;
+          }
+          .flow-connector {
+            width: 2px;
+            height: 30px;
+            margin-top: 0;
+          }
         }
 
         @media (max-width: 768px) {
