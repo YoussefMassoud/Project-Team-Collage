@@ -22,9 +22,8 @@ export default function Navbar() {
         <nav className="fixed top-0 left-0 right-0 z-50 glass-panel nav-wrapper">
             <div className="container flex-nav">
                 <Link href="/" style={{ textDecoration: 'none' }}>
-                    <h1 className="gradient-text logo">SocialPulse</h1>
+                    <h1 className="gradient-text logo">Reachify</h1>
                 </Link>
-
                 {/* Desktop Links */}
                 <div className="desktop-links">
                     {links.map((link) => {
