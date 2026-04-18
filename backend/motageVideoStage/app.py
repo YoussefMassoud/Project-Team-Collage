@@ -345,7 +345,7 @@ class VideoMontageMaker:
             preset="medium",
         )
 
-        print(f"✅ Video created successfully: {output_file}")
+        print(f"Video created successfully: {output_file}")
         return output_file
 
 

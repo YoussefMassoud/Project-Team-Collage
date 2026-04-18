@@ -103,10 +103,17 @@ def analyze_json_with_gemini(json_file_path, output_file_path, audio_file_path):
 
         prompt = f"""
         Act as a social media analyst. Analyze the following JSON data.
-        Provide a detailed human-like analysis covering:
-        1. Positive aspects.
-        2. Negative aspects.
-        3. Areas for Improvement.
+        Provide a detailed human-like analysis. 
+        You MUST structure your response with exactly these three section headers (include the "Part" prefixes):
+        
+        Part One: The Negatives
+        [Describe negative aspects, friction points, or complaints here]
+        
+        Part Two: The Positives
+        [Describe positive aspects, high engagement, or good things here]
+        
+        Part Three: How to Improve
+        [Provide actionable advice and suggestions here]
         
         Data:
         {json_str}

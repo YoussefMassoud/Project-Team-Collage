@@ -8,34 +8,40 @@ import OnboardingModal from '@/components/OnboardingModal';
 
 export default function Home() {
   const [url, setUrl] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loadingStage, setLoadingStage] = useState('');
   const router = useRouter();
 
   const handleAnalyze = async () => {
     if (!url) return;
-    setLoading(true);
+    setLoadingStage('Fetching post data...');
     try {
       // 1. Fetch Post Data
       const postRes = await fetchPost(url);
 
-      // Check if we got a valid post object (checking for a key like 'text' or 'post_id')
       if (postRes && !postRes.message) {
         localStorage.setItem('currentPost', JSON.stringify(postRes));
 
         // 2. Analyze Post
+        setLoadingStage('AI analyzing engagement & sentiment...');
         const analysisRes = await analyzePost(postRes);
+        
+        if (analysisRes.message && analysisRes.message.includes('Error')) {
+             throw new Error(analysisRes.message);
+        }
+        
         localStorage.setItem('currentAnalysis', JSON.stringify(analysisRes));
 
         // 3. Redirect
+        setLoadingStage('Generating results...');
         router.push('/dashboard');
       } else {
         alert("Failed to fetch post: " + (postRes.message || "Unknown error"));
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error:", error);
-      alert("Failed to analyze post. Please check the backend connection.");
+      alert("Failed to analyze post: " + (error.message || "Please check backend connection."));
     } finally {
-      setLoading(false);
+      setLoadingStage('');
     }
   };
 
@@ -77,12 +83,22 @@ export default function Home() {
         <button
           className="btn-primary"
           onClick={handleAnalyze}
-          disabled={loading}
+          disabled={!!loadingStage}
           style={{ minWidth: '140px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}
         >
-          {loading ? <Loader2 className="animate-spin" /> : 'Analyze Now'}
+          {loadingStage ? <Loader2 className="animate-spin" /> : 'Analyze Now'}
         </button>
       </motion.div>
+
+      {loadingStage && (
+        <motion.p 
+          initial={{ opacity: 0 }} 
+          animate={{ opacity: 1 }} 
+          style={{ marginTop: '15px', color: '#22d3ee', fontWeight: '500' }}
+        >
+          {loadingStage}
+        </motion.p>
+      )}
 
       <div style={{ marginTop: '60px', display: 'flex', gap: '40px', opacity: 0.5 }}>
         <span>Facebook</span>

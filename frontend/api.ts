@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = 'http://localhost:5001/api';
 
 const fetchApi = async (endpoint: string, body: any) => {
     const res = await fetch(`${API_BASE}${endpoint}`, {
@@ -14,6 +14,15 @@ export const fetchPost = async (url: string) => {
 };
 
 export const analyzePost = async (data: any) => {
-    return fetchApi('/analyze', data);
+    // Calling the new unified pipeline on port 5001
+    const res = await fetch('http://localhost:5001/api/all-flow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    return res.json();
 };
-
+export const checkVideoStatus = async () => {
+    const res = await fetch('http://localhost:5001/api/video-status');
+    return res.json();
+};
