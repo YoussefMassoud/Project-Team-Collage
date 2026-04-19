@@ -128,6 +128,16 @@ def run_all_flow():
         # 4. Return analysis data IMMEDIATELY
         analysis_result = {
             "topics": ["Customer Service", "Pricing", "Discount"],
+            "pros": [
+                "Strong community engagement",
+                "High visual appeal of food",
+                "Fast response to positive feedback"
+            ],
+            "cons": [
+                "Missing price information",
+                "High customer frustration in comments",
+                "Repetitive automated replies"
+            ],
             "issues": [
                 "No price listed created major friction",
                 "Over 1000 comments asking 'how much?'",
@@ -144,8 +154,27 @@ def run_all_flow():
                 "Neutral": 15
             },
             "sentiment": "Negative",
-            "video_ready": False # Start as false, UI will check status
+            "video_ready": False 
         }
+        
+        # 5. Success message to console
+        print("\n" + "╔" + "═"*58 + "╗")
+        print("║" + " ANALYSIS COMPLETE ".center(58) + "║")
+        print("╚" + "═"*58 + "╝")
+        
+        print(f"\n[AI] Topics: {', '.join(analysis_result['topics'])}")
+        
+        print("\n[PROS]")
+        for pro in analysis_result["pros"]:
+            print(f"  + {pro}")
+            
+        print("\n[CONS]")
+        for con in analysis_result["cons"]:
+            print(f"  - {con}")
+            
+        print(f"\n[SENTIMENT] {analysis_result['sentiment']}")
+        print("\n" + "═"*60 + "\n")
+        
         return jsonify(analysis_result), 200
 
     except Exception as e:
