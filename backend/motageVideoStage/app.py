@@ -267,9 +267,7 @@ class VideoMontageMaker:
         audio = AudioFileClip(audio_path)
         total_duration = audio.duration
         sections = self.parse_script(script_path)
-        title_card_duration = 3.0
-        if total_duration < 30:
-            title_card_duration = 2.0
+        title_card_duration = 1.4
             
         # Calculate section durations based on word count for better synchronization
         content_sections = ["intro", "negatives", "positives", "improvements"]
@@ -406,8 +404,10 @@ class VideoMontageMaker:
             chunk_dur = section_dur / len(chunks)
             
             for i, chunk_text in enumerate(chunks):
-                c_start = start_t + (i * chunk_dur)
-                c_end = c_start + chunk_dur
+                # 3.0s offset for maximum Pro sync (triple the original speed)
+                offset = 3.0
+                c_start = max(0, start_t + (i * chunk_dur) - offset)
+                c_end = max(0, c_start + chunk_dur)
                 
                 # Add the subtitle
                 subtitle_clips.extend(
