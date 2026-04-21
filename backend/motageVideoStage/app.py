@@ -179,8 +179,8 @@ class VideoMontageMaker:
 
         return [txt_clip]
 
-    def create_image_clip_with_zoom(self, image_path, duration):
-        """Create image clip with proper sizing"""
+    def create_image_clip_with_zoom(self, image_path, duration, text=None):
+        """Create image clip with proper sizing and optional text overlay"""
         img_clip = ImageClip(image_path, duration=duration)
         img_clip = img_clip.resize(height=self.video_size[1])
         if img_clip.w > self.video_size[0]:
@@ -193,6 +193,19 @@ class VideoMontageMaker:
             img_clip = img_clip.set_position("center")
             bg = ColorClip(size=self.video_size, color=(0, 0, 0), duration=duration)
             img_clip = CompositeVideoClip([bg, img_clip])
+
+        if text and text.strip():
+            # Create centered text overlay
+            text_img = self.create_text_image(
+                text.strip(),
+                font_size=60,
+                color=(255, 255, 255),
+                bg_color=(0, 0, 0, 160),  # Semi-transparent black background
+                max_width=self.video_size[0] - 300,
+                align="center",
+            )
+            text_clip = ImageClip(text_img, duration=duration).set_position("center")
+            img_clip = CompositeVideoClip([img_clip, text_clip])
 
         return img_clip
 
@@ -256,7 +269,9 @@ class VideoMontageMaker:
 
         print("Creating intro section...")
         intro_clip = self.create_image_clip_with_zoom(
-            images["intro"], duration=timings["intro"][1] - timings["intro"][0]
+            images["intro"],
+            duration=timings["intro"][1] - timings["intro"][0],
+            text=sections["intro"],
         )
         intro_clip = vfx.fadein(vfx.fadeout(intro_clip, 1), 1)
         clips.append(intro_clip)
@@ -271,6 +286,7 @@ class VideoMontageMaker:
         neg_clip = self.create_image_clip_with_zoom(
             images["negatives"],
             duration=timings["negatives"][1] - timings["negatives"][0],
+            text=sections["negatives"],
         )
         neg_clip = vfx.fadein(vfx.fadeout(neg_clip, 1), 1)
         clips.append(neg_clip)
@@ -285,6 +301,7 @@ class VideoMontageMaker:
         pos_clip = self.create_image_clip_with_zoom(
             images["positives"],
             duration=timings["positives"][1] - timings["positives"][0],
+            text=sections["positives"],
         )
         pos_clip = vfx.fadein(vfx.fadeout(pos_clip, 1), 1)
         clips.append(pos_clip)
@@ -300,6 +317,7 @@ class VideoMontageMaker:
         imp_clip = self.create_image_clip_with_zoom(
             images["improvements"],
             duration=timings["improvements"][1] - timings["improvements"][0],
+            text=sections["improvements"],
         )
         imp_clip = vfx.fadein(vfx.fadeout(imp_clip, 1), 1)
         clips.append(imp_clip)
