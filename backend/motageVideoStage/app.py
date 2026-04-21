@@ -194,19 +194,6 @@ class VideoMontageMaker:
             bg = ColorClip(size=self.video_size, color=(0, 0, 0), duration=duration)
             img_clip = CompositeVideoClip([bg, img_clip])
 
-        if text and text.strip():
-            # Create centered text overlay
-            text_img = self.create_text_image(
-                text.strip(),
-                font_size=60,
-                color=(255, 255, 255),
-                bg_color=(0, 0, 0, 160),  # Semi-transparent black background
-                max_width=self.video_size[0] - 300,
-                align="center",
-            )
-            text_clip = ImageClip(text_img, duration=duration).set_position("center")
-            img_clip = CompositeVideoClip([img_clip, text_clip])
-
         return img_clip
 
     def parse_script(self, script_path):
@@ -247,16 +234,34 @@ class VideoMontageMaker:
         audio = AudioFileClip(audio_path)
         total_duration = audio.duration
         sections = self.parse_script(script_path)
-        timings = {
-            "intro_title": (0, 3),
-            "intro": (3, 17),
-            "negatives_title": (17, 21),
-            "negatives": (21, 41),
-            "positives_title": (41, 45),
-            "positives": (45, 65),
-            "improvements_title": (65, 69),
-            "improvements": (69, total_duration),
-        }
+        title_card_duration = 3.0
+        if total_duration < 30:
+            title_card_duration = 2.0
+            
+        remaining_time = total_duration - (4 * title_card_duration)
+        content_duration = remaining_time / 4
+        
+        t = 0
+        timings = {}
+        
+        timings["intro_title"] = (t, t + title_card_duration)
+        t += title_card_duration
+        timings["intro"] = (t, t + content_duration)
+        t += content_duration
+        
+        timings["negatives_title"] = (t, t + title_card_duration)
+        t += title_card_duration
+        timings["negatives"] = (t, t + content_duration)
+        t += content_duration
+        
+        timings["positives_title"] = (t, t + title_card_duration)
+        t += title_card_duration
+        timings["positives"] = (t, t + content_duration)
+        t += content_duration
+        
+        timings["improvements_title"] = (t, t + title_card_duration)
+        t += title_card_duration
+        timings["improvements"] = (t, total_duration)
 
         clips = []
 
@@ -341,10 +346,16 @@ class VideoMontageMaker:
             (83, 90, "Add clear call to action for conversions"),
         ]
 
+        # Scale subtitles to match dynamic duration
+        original_max = 90.0
+        scale = total_duration / original_max
+        
         for start, end, text in subtitles_data:
-            if end <= total_duration:
+            scaled_start = start * scale
+            scaled_end = end * scale
+            if scaled_end <= total_duration:
                 subtitle_clips.extend(
-                    self.add_subtitle(text, start, end, self.video_size)
+                    self.add_subtitle(text, scaled_start, scaled_end, self.video_size)
                 )
 
         if subtitle_clips:
