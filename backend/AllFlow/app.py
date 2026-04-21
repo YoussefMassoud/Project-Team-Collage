@@ -118,7 +118,7 @@ def run_all_flow():
         
         analyze_output = os.path.join(analyze_dir, 'file.txt')
         if not os.path.exists(analyze_output) or os.path.getsize(analyze_output) < 10:
-            fallback_text = "Part One: The Negatives\nNo price listed created major friction. Over 1000 comments asking 'how much?'.\n\nPart Two: The Positives\nStrong interest with 1100 comments. Hundreds of likes.\n\nPart Three: How to Improve\nInclude price in post. Replace vague replies with clear answers."
+            fallback_text = "Hello Bazooka Fried Chicken, in this video we will summarize your post data in three parts.\n\nPart One: The Negatives\nNo price listed created major friction. Over 1000 comments asking 'how much?'.\n\nPart Two: The Positives\nStrong interest with 1100 comments. Hundreds of likes.\n\nPart Three: How to Improve\nInclude price in post. Replace vague replies with clear answers."
             with open(analyze_output, 'w', encoding='utf-8') as f:
                 f.write(fallback_text)
 
