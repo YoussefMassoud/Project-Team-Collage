@@ -1,11 +1,11 @@
-from moviepy.editor import (
+from moviepy import (
     ImageClip,
     AudioFileClip,
     CompositeVideoClip,
     concatenate_videoclips,
     ColorClip,
 )
-import moviepy.video.fx.all as vfx
+import moviepy.video.fx as vfx
 import os
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
@@ -102,24 +102,36 @@ class VideoMontageMaker:
         shadow_img = self.create_text_image(
             title, font_size=80, color=(0, 0, 0), max_width=self.video_size[0] - 200
         )
-        shadow_clip = ImageClip(shadow_img, duration=duration).set_position(
+        shadow_clip = ImageClip(shadow_img, duration=duration).with_position(
             lambda t: (
                 self.video_size[0] // 2 - shadow_img.shape[1] // 2 + 3,
                 self.video_size[1] // 2 - shadow_img.shape[0] // 2 + 3,
             )
         )
 
-        title_clip = ImageClip(title_img, duration=duration).set_position("center")
+        title_clip = ImageClip(title_img, duration=duration).with_position("center")
 
         composite = CompositeVideoClip([bg, shadow_clip, title_clip])
-        composite = vfx.fadein(composite, 0.5)
-        composite = vfx.fadeout(composite, 0.5)
+        composite = composite.with_effects([vfx.FadeIn(0.5), vfx.FadeOut(0.5)])
 
         return composite
 
-    def create_section_title(self, section_title, subtitle, duration=4):
-        """Create section title card with gradient background"""
-        bg = self.create_gradient_background((30, 50, 80), (60, 80, 120), duration)
+    def create_section_title(self, section_title, subtitle, duration=4, image_path=None):
+        """Create section title card with full image background"""
+        if image_path and os.path.exists(image_path):
+            # Use image as background
+            bg_img = ImageClip(image_path, duration=duration).resized(width=self.video_size[0])
+            if bg_img.h > self.video_size[1]:
+                bg_img = bg_img.cropped(y_center=bg_img.h/2, height=self.video_size[1])
+            
+            # Add a slight dark tint so text is readable
+            dark_bg = ColorClip(size=self.video_size, color=(0, 0, 0), duration=duration)
+            bg_img = bg_img.with_opacity(0.7).with_position("center")
+            elements = [dark_bg, bg_img]
+        else:
+            # Fallback to gradient if no image
+            bg = self.create_gradient_background((30, 50, 80), (60, 80, 120), duration)
+            elements = [bg]
 
         main_title_img = self.create_text_image(
             section_title,
@@ -128,9 +140,10 @@ class VideoMontageMaker:
             max_width=self.video_size[0] - 200,
         )
 
-        main_title = ImageClip(main_title_img, duration=duration).set_position(
+        main_title = ImageClip(main_title_img, duration=duration).with_position(
             ("center", self.video_size[1] // 3 - main_title_img.shape[0] // 2)
         )
+        
         sub_title_img = self.create_text_image(
             subtitle,
             font_size=50,
@@ -138,13 +151,13 @@ class VideoMontageMaker:
             max_width=self.video_size[0] - 400,
         )
 
-        sub_title = ImageClip(sub_title_img, duration=duration).set_position(
+        sub_title = ImageClip(sub_title_img, duration=duration).with_position(
             ("center", self.video_size[1] // 2 + 50)
         )
 
-        composite = CompositeVideoClip([bg, main_title, sub_title])
-        composite = vfx.fadein(composite, 0.8)
-        composite = vfx.fadeout(composite, 0.8)
+        elements.extend([main_title, sub_title])
+        composite = CompositeVideoClip(elements)
+        composite = composite.with_effects([vfx.FadeIn(0.8), vfx.FadeOut(0.8)])
 
         return composite
 
@@ -162,38 +175,58 @@ class VideoMontageMaker:
         return clip
 
     def add_subtitle(self, text, start_time, end_time, video_size):
-        """Create subtitle with nice background box"""
+        """Create pro subtitle in the center without a background box"""
         duration = end_time - start_time
         subtitle_img = self.create_text_image(
-            text,
-            font_size=45,
+            text.upper(), # Pro style: Uppercase
+            font_size=65,
             color=(255, 255, 255),
-            bg_color=(0, 0, 0, 180), 
-            max_width=video_size[0] - 250,
+            bg_color=None, # No background box
+            max_width=video_size[0] - 300,
         )
+        
+        # Add a shadow for better visibility in center
+        shadow_img = self.create_text_image(
+            text.upper(),
+            font_size=65,
+            color=(0, 0, 0),
+            bg_color=None,
+            max_width=video_size[0] - 300,
+        )
+
+        shadow_clip = (
+            ImageClip(shadow_img, duration=duration)
+            .with_position(("center", video_size[1] // 2 + 5))
+            .with_start(start_time)
+            .with_opacity(0.6)
+        )
+
         txt_clip = (
             ImageClip(subtitle_img, duration=duration)
-            .set_position(("center", video_size[1] - 200))
-            .set_start(start_time)
+            .with_position("center")
+            .with_start(start_time)
         )
 
-        return [txt_clip]
+        return [shadow_clip, txt_clip]
 
     def create_image_clip_with_zoom(self, image_path, duration, text=None):
-        """Create image clip with proper sizing and optional text overlay"""
+        """Create image clip that always fills the screen (no black bars)"""
         img_clip = ImageClip(image_path, duration=duration)
-        img_clip = img_clip.resize(height=self.video_size[1])
-        if img_clip.w > self.video_size[0]:
-            img_clip = img_clip.crop(
-                x_center=img_clip.w / 2,
-                width=self.video_size[0],
-                height=self.video_size[1],
-            )
-        else:
-            img_clip = img_clip.set_position("center")
-            bg = ColorClip(size=self.video_size, color=(0, 0, 0), duration=duration)
-            img_clip = CompositeVideoClip([bg, img_clip])
-
+        
+        # Calculate scaling to cover the screen
+        w_ratio = self.video_size[0] / img_clip.w
+        h_ratio = self.video_size[1] / img_clip.h
+        fill_ratio = max(w_ratio, h_ratio)
+        
+        # Resize and center crop
+        img_clip = img_clip.resized(fill_ratio)
+        img_clip = img_clip.cropped(
+            x_center=img_clip.w / 2,
+            y_center=img_clip.h / 2,
+            width=self.video_size[0],
+            height=self.video_size[1]
+        ).with_position("center")
+        
         return img_clip
 
     def parse_script(self, script_path):
@@ -238,27 +271,43 @@ class VideoMontageMaker:
         if total_duration < 30:
             title_card_duration = 2.0
             
+        # Calculate section durations based on word count for better synchronization
+        content_sections = ["intro", "negatives", "positives", "improvements"]
+        word_counts = {sec: len(sections[sec].split()) for sec in content_sections}
+        total_words = sum(word_counts.values())
+        
+        # Avoid division by zero
+        if total_words == 0:
+            total_words = 1
+            word_counts = {sec: 1 for sec in content_sections}
+            
         remaining_time = total_duration - (4 * title_card_duration)
-        content_duration = remaining_time / 4
         
         t = 0
         timings = {}
         
+        # Intro
         timings["intro_title"] = (t, t + title_card_duration)
         t += title_card_duration
-        timings["intro"] = (t, t + content_duration)
-        t += content_duration
+        intro_dur = (word_counts["intro"] / total_words) * remaining_time
+        timings["intro"] = (t, t + intro_dur)
+        t += intro_dur
         
+        # Negatives
         timings["negatives_title"] = (t, t + title_card_duration)
         t += title_card_duration
-        timings["negatives"] = (t, t + content_duration)
-        t += content_duration
+        neg_dur = (word_counts["negatives"] / total_words) * remaining_time
+        timings["negatives"] = (t, t + neg_dur)
+        t += neg_dur
         
+        # Positives
         timings["positives_title"] = (t, t + title_card_duration)
         t += title_card_duration
-        timings["positives"] = (t, t + content_duration)
-        t += content_duration
+        pos_dur = (word_counts["positives"] / total_words) * remaining_time
+        timings["positives"] = (t, t + pos_dur)
+        t += pos_dur
         
+        # Improvements
         timings["improvements_title"] = (t, t + title_card_duration)
         t += title_card_duration
         timings["improvements"] = (t, total_duration)
@@ -278,13 +327,14 @@ class VideoMontageMaker:
             duration=timings["intro"][1] - timings["intro"][0],
             text=sections["intro"],
         )
-        intro_clip = vfx.fadein(vfx.fadeout(intro_clip, 1), 1)
+        intro_clip = intro_clip.with_effects([vfx.FadeIn(1), vfx.FadeOut(1)])
         clips.append(intro_clip)
         print("Creating negatives section...")
         neg_title = self.create_section_title(
             "Part One",
             "The Negatives",
             duration=timings["negatives_title"][1] - timings["negatives_title"][0],
+            image_path=images["negatives"],
         )
         clips.append(neg_title)
 
@@ -293,13 +343,14 @@ class VideoMontageMaker:
             duration=timings["negatives"][1] - timings["negatives"][0],
             text=sections["negatives"],
         )
-        neg_clip = vfx.fadein(vfx.fadeout(neg_clip, 1), 1)
+        neg_clip = neg_clip.with_effects([vfx.FadeIn(1), vfx.FadeOut(1)])
         clips.append(neg_clip)
         print("Creating positives section...")
         pos_title = self.create_section_title(
             "Part Two",
             "The Positives",
             duration=timings["positives_title"][1] - timings["positives_title"][0],
+            image_path=images["positives"],
         )
         clips.append(pos_title)
 
@@ -308,7 +359,7 @@ class VideoMontageMaker:
             duration=timings["positives"][1] - timings["positives"][0],
             text=sections["positives"],
         )
-        pos_clip = vfx.fadein(vfx.fadeout(pos_clip, 1), 1)
+        pos_clip = pos_clip.with_effects([vfx.FadeIn(1), vfx.FadeOut(1)])
         clips.append(pos_clip)
         print("Creating improvements section...")
         imp_title = self.create_section_title(
@@ -316,6 +367,7 @@ class VideoMontageMaker:
             "How to Improve",
             duration=timings["improvements_title"][1]
             - timings["improvements_title"][0],
+            image_path=images["improvements"],
         )
         clips.append(imp_title)
 
@@ -324,38 +376,42 @@ class VideoMontageMaker:
             duration=timings["improvements"][1] - timings["improvements"][0],
             text=sections["improvements"],
         )
-        imp_clip = vfx.fadein(vfx.fadeout(imp_clip, 1), 1)
+        imp_clip = imp_clip.with_effects([vfx.FadeIn(1), vfx.FadeOut(1)])
         clips.append(imp_clip)
         print("Concatenating clips...")
         final_video = concatenate_videoclips(clips, method="compose")
         print("Adding audio...")
-        final_video = final_video.set_audio(audio)
+        final_video = final_video.with_audio(audio)
         print("Adding subtitles...")
-        subtitle_clips = []
-        subtitles_data = [
-            (3, 10, "Today we're breaking down Bazooka Fried Chicken"),
-            (10, 17, "Looking at what works and what doesn't"),
-            (21, 28, "No price listed created major friction"),
-            (28, 35, "Over 1000 comments asking 'how much?'"),
-            (35, 41, "Generic replies provided zero value"),
-            (45, 52, "Strong initial interest with 1100 comments"),
-            (52, 59, "Hundreds of likes and positive reactions"),
-            (59, 65, "Brand was active and engaging"),
-            (69, 76, "Always include price in the post"),
-            (76, 83, "Replace vague replies with clear answers"),
-            (83, 90, "Add clear call to action for conversions"),
-        ]
-
-        # Scale subtitles to match dynamic duration
-        original_max = 90.0
-        scale = total_duration / original_max
+        # Dynamic Subtitles will be generated based on the script content
         
-        for start, end, text in subtitles_data:
-            scaled_start = start * scale
-            scaled_end = end * scale
-            if scaled_end <= total_duration:
+        # Dynamic Subtitle Generation
+        subtitle_clips = []
+        
+        for section_name in content_sections:
+            start_t, end_t = timings[section_name]
+            text = sections[section_name].strip()
+            if not text:
+                continue
+                
+            # Split text into chunks (approx 7 words each for pro look)
+            words = text.split()
+            chunk_size = 7
+            chunks = [" ".join(words[i:i+chunk_size]) for i in range(0, len(words), chunk_size)]
+            
+            section_dur = end_t - start_t
+            if not chunks:
+                continue
+                
+            chunk_dur = section_dur / len(chunks)
+            
+            for i, chunk_text in enumerate(chunks):
+                c_start = start_t + (i * chunk_dur)
+                c_end = c_start + chunk_dur
+                
+                # Add the subtitle
                 subtitle_clips.extend(
-                    self.add_subtitle(text, scaled_start, scaled_end, self.video_size)
+                    self.add_subtitle(chunk_text, c_start, c_end, self.video_size)
                 )
 
         if subtitle_clips:
