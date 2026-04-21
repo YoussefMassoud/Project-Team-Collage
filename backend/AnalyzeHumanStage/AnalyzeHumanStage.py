@@ -123,9 +123,14 @@ def analyze_json_with_gemini(json_file_path, output_file_path, audio_file_path):
         response = model.generate_content(prompt)
         analysis_text = response.text
 
+        # Add Intro
+        post_author = data.get("post_author", "Client")
+        intro = f"Hello {post_author}, in this video we will summarize your post data in three parts.\n\n"
+        full_analysis = intro + analysis_text
+
         # Save Text
         with open(output_file_path, 'w', encoding='utf-8') as f:
-            f.write(analysis_text)
+            f.write(full_analysis)
         print(f"Analysis text saved to {output_file_path}")
 
         # Generate Audio (Disabled per user request)

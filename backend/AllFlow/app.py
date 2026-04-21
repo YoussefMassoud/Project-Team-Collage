@@ -107,11 +107,11 @@ def run_all_flow():
     video_dir = os.path.join(BACKEND_DIR, 'motageVideoStage')
 
     try:
-        # 1. Provide input to AnalyzeHumanStage
-        source_json = os.path.join(BACKEND_DIR, 'BazookaFriedChicken.json')
         dest_json = os.path.join(analyze_dir, 'BazookaFriedChicken.json')
-        if os.path.exists(source_json):
-            shutil.copy2(source_json, dest_json)
+        if not os.path.exists(dest_json):
+            source_json = os.path.join(BACKEND_DIR, 'BazookaFriedChicken.json')
+            if os.path.exists(source_json):
+                shutil.copy2(source_json, dest_json)
             
         # 2. Run AnalyzeHumanStage (FAST PATH)
         run_stage('AnalyzeHumanStage', 'AnalyzeHumanStage.py', ignore_failure=True)
@@ -194,7 +194,7 @@ def get_video_status():
 @app.route('/api/fetch-post', methods=['POST'])
 def fetch_post():
     try:
-        source_json = os.path.join(BACKEND_DIR, 'BazookaFriedChicken.json')
+        source_json = os.path.join(BACKEND_DIR, 'AnalyzeHumanStage', 'BazookaFriedChicken.json')
         with open(source_json, 'r', encoding='utf-8') as f:
             data = json.load(f)
             
