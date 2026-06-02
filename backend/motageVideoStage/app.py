@@ -331,6 +331,13 @@ class VideoMontageMaker:
         # Phase 1: compute all timings and collect audio
         section_audios = {}
         section_durations = {}
+        section_title_durations = {}
+        section_titles = {
+            "intro": "Introduction",
+            "negatives": "Part One: The Negatives",
+            "positives": "Part Two: The Positives",
+            "improvements": "Part Three: How to Improve",
+        }
         t = 0.0
 
         for section_name in content_sections:
@@ -351,18 +358,41 @@ class VideoMontageMaker:
                 section_durations[section_name] = d
                 audio_clips.append(ac)
 
-                labels = {
-                    "intro": "Introduction",
-                    "negatives": "Part One: The Negatives",
-                    "positives": "Part Two: The Positives",
-                    "improvements": "Part Three: How to Improve",
-                }
-                subtitle_text = f"{labels[section_name]}\n{text}"
+                subtitle_text = f"{section_titles[section_name]}\n{text}"
                 subtitle_clips.extend(
                     self.add_subtitle(subtitle_text, t, t + d, self.video_size)
                 )
                 t += d
             else:
+                # --- Generate spoken audio for the section title ---
+                section_title_audio_text = section_titles[section_name]
+                if section_name == "intro":
+                    section_title_audio_text = "Bazooka Fried Chicken Social Media Analysis"
+                title_segments = split_text_by_language(section_title_audio_text)
+                title_chunk_clips = []
+                for seg in title_segments:
+                    if not seg['text'].strip():
+                        continue
+                    try:
+                        tts = gTTS(text=seg['text'], lang=seg['lang'])
+                        tmp = os.path.join(self.output_path, f"temp_title_{uuid.uuid4().hex}.mp3")
+                        tts.save(tmp)
+                        temp_audio_files.append(tmp)
+                        title_chunk_clips.append(AudioFileClip(tmp))
+                    except Exception as e:
+                        print(f"Error generating title audio: {e}")
+                if title_chunk_clips:
+                    title_audio = concatenate_audioclips(title_chunk_clips) if len(title_chunk_clips) > 1 else title_chunk_clips[0]
+                    title_dur = title_audio.duration
+                    if title_dur is None:
+                        title_dur = len(section_title_audio_text.split()) * 0.3
+                    audio_clips.append(title_audio)
+                    section_title_durations[section_name] = title_dur
+                    t += title_dur
+                else:
+                    section_title_durations[section_name] = 1.4
+
+                # --- Content chunks ---
                 words = text.split()
                 chunk_size = 7
                 chunks = [" ".join(words[i:i+chunk_size]) for i in range(0, len(words), chunk_size)]
@@ -412,14 +442,12 @@ class VideoMontageMaker:
                 clip = clip.with_effects([vfx.FadeIn(1), vfx.FadeOut(1)])
                 clips.append(clip)
             else:
-                # Title card + content image (original style)
-                # dur = content audio duration (gTTS chunks, excludes title card)
+                # Title card + content image
+                # Title card duration matches the spoken title audio
+                title_dur = section_title_durations.get(section_name, 1.4)
                 if section_name == "intro":
-                    card = self.create_title_card("Bazooka Fried Chicken Social Media Analysis", duration=1.4)
+                    card = self.create_title_card("Bazooka Fried Chicken Social Media Analysis", duration=title_dur)
                     clips.append(card)
-                    img = self.create_image_clip_with_zoom(images[section_name], dur)
-                    img = img.with_effects([vfx.FadeIn(1), vfx.FadeOut(1)])
-                    clips.append(img)
                 else:
                     title_map = {
                         "negatives": ("Part One", "The Negatives"),
@@ -427,11 +455,11 @@ class VideoMontageMaker:
                         "improvements": ("Part Three", "How to Improve"),
                     }
                     title_text, sub_text = title_map[section_name]
-                    card = self.create_section_title(title_text, sub_text, duration=1.4, image_path=images[section_name])
+                    card = self.create_section_title(title_text, sub_text, duration=title_dur, image_path=images[section_name])
                     clips.append(card)
-                    img = self.create_image_clip_with_zoom(images[section_name], dur)
-                    img = img.with_effects([vfx.FadeIn(1), vfx.FadeOut(1)])
-                    clips.append(img)
+                img = self.create_image_clip_with_zoom(images[section_name], dur)
+                img = img.with_effects([vfx.FadeIn(1), vfx.FadeOut(1)])
+                clips.append(img)
 
         print("Concatenating clips...")
         final_video = concatenate_videoclips(clips, method="compose")
