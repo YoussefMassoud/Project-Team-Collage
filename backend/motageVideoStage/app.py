@@ -66,6 +66,19 @@ class VideoMontageMaker:
         self.video_size = (1920, 1080)
         self.fps = 30
 
+        self.post_author = "Bazooka Fried Chicken"
+        json_path = os.path.join(self.base_dir, "..", "AnalyzeHumanStage", "BazookaFriedChicken.json")
+        json_path = os.path.normpath(json_path)
+        if os.path.exists(json_path):
+            try:
+                import json
+                with open(json_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if "post_author" in data:
+                    self.post_author = data["post_author"]
+            except Exception:
+                pass
+
     def load_best_font(self, font_size, bold=False):
         """Try modern system fonts in priority order, fall back gracefully."""
         if bold:
@@ -161,20 +174,163 @@ class VideoMontageMaker:
 
         return np.array(img)
 
-    def create_title_card(self, title, duration=3.0, bg_color=(20, 20, 40)):
-        bg = ColorClip(size=self.video_size, color=bg_color, duration=duration)
-        title_img = self.create_text_image(
-            title,
-            font_size=80,
-            color=(255, 255, 255),
-            max_width=self.video_size[0] - 200,
+    def create_intro_card(self, duration=4.0):
+        w, h = self.video_size
+        dur = duration
+
+        # ─── Animated gradient background ───
+        n_steps = 60
+        step_dur = dur / n_steps
+        clips = []
+        for s in range(n_steps):
+            t = s / n_steps
+            angle = t * np.pi * 2
+            c1 = (15, 5, 35)
+            c2 = (55, 15, 80)
+            c3 = (100, 30, 130)
+            c4 = (124, 58, 180)
+
+            img = Image.new("RGBA", (w, h))
+            draw = ImageDraw.Draw(img)
+            for y in range(h):
+                p = y / h
+                wave = np.sin(angle + p * np.pi * 3) * 0.15
+                mix = p + wave
+                r = int(c1[0] * (1-mix) + c2[0] * mix) if mix < 0.5 else int(c2[0] * (2-2*mix) + c3[0] * (2*mix-1))
+                g = int(c1[1] * (1-mix) + c2[1] * mix) if mix < 0.5 else int(c2[1] * (2-2*mix) + c3[1] * (2*mix-1))
+                b = int(c1[2] * (1-mix) + c2[2] * mix) if mix < 0.5 else int(c2[2] * (2-2*mix) + c3[2] * (2*mix-1))
+                draw.line([(0, y), (w, y)], fill=(r, g, b))
+
+            # ─── Grid overlay ───
+            grid_color = (80, 50, 120, 12)
+            for y in range(0, h, 70):
+                draw.line([(0, y), (w, y)], fill=grid_color)
+            for x in range(0, w, 70):
+                draw.line([(x, 0), (x, h)], fill=grid_color)
+
+            # ─── Scan line glow ───
+            scan_y = int(((t * 1.2) % 1.0) * h)
+            for dy in range(-3, 4):
+                sy = scan_y + dy
+                if 0 <= sy < h:
+                    alpha = max(0, 60 - abs(dy) * 15)
+                    draw.line([(0, sy), (w, sy)], fill=(180, 130, 255, alpha))
+
+            clip = ImageClip(np.array(img), duration=step_dur).with_start(s * step_dur)
+            clips.append(clip)
+
+        bg = concatenate_videoclips(clips, method="compose")
+
+        # ─── Vignette overlay ───
+        yy, xx = np.meshgrid(np.arange(h), np.arange(w), indexing='ij')
+        dx = (xx - w / 2) / (w / 2)
+        dy = (yy - h / 2) / (h / 2)
+        dist = np.sqrt(dx * dx + dy * dy)
+        vig_alpha = np.clip((dist - 0.4) * 300, 0, 200).astype(np.uint8)
+        vig_array = np.zeros((h, w, 4), dtype=np.uint8)
+        vig_array[:, :, 3] = vig_alpha
+        vignette_clip = ImageClip(vig_array, duration=dur)
+
+        # ─── Corner brackets ───
+        def make_corner_bracket(cx, cy, flip_x, flip_y):
+            bracket_size = 60
+            bracket_thick = 4
+            bracket_gap = 30
+            img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+            d = ImageDraw.Draw(img)
+            mx = 1 if flip_x else -1
+            my = 1 if flip_y else -1
+            x0 = cx + mx * bracket_gap
+            y0 = cy + my * bracket_gap
+            x1 = cx + mx * (bracket_gap + bracket_size)
+            y1 = cy + my * (bracket_gap + bracket_size)
+            color = (180, 130, 255, 180)
+            d.line([(x0, y0), (x1, y0)], fill=color, width=bracket_thick)
+            d.line([(x0, y0), (x0, y1)], fill=color, width=bracket_thick)
+            return ImageClip(np.array(img), duration=dur)
+
+        corners = ["tl", "tr", "bl", "br"]
+        corner_positions = {
+            "tl": (80, 80, False, False),
+            "tr": (w-80, 80, True, False),
+            "bl": (80, h-80, False, True),
+            "br": (w-80, h-80, True, True),
+        }
+        corner_clips = []
+        for pos in corners:
+            cx, cy, fx, fy = corner_positions[pos]
+            corner_clips.append(make_corner_bracket(cx, cy, fx, fy))
+
+        # ─── Author name with glow ───
+        author_font = self.load_best_font(120, bold=True)
+        author_text = self.post_author.upper()
+
+        def make_author_layer():
+            img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+            d = ImageDraw.Draw(img)
+            temp = Image.new("RGBA", (1, 1))
+            td = ImageDraw.Draw(temp)
+            bbox = td.textbbox((0, 0), author_text, font=author_font)
+            tw = bbox[2] - bbox[0]
+            th = bbox[3] - bbox[1]
+            ax = (w - tw) // 2
+            ay = h // 2 - th // 2 - 40
+
+            # glow layers
+            for radius in range(8, 0, -1):
+                glow_color = (124, 58, 237, 40 - radius * 4)
+                d.text((ax + 0, ay + 0), author_text, font=author_font, fill=glow_color,
+                       stroke_width=radius+2, stroke_fill=(124, 58, 237, 20-radius*2))
+            # main text
+            d.text((ax, ay), author_text, font=author_font, fill=(255, 255, 255))
+            return ImageClip(np.array(img), duration=dur)
+
+        author_clip = make_author_layer()
+
+        # ─── Subtitle ───
+        sub_img = self.create_text_image(
+            "SOCIAL MEDIA ANALYSIS",
+            font_size=45,
+            color=(255, 215, 0),
+            max_width=w - 300,
             bold=True,
         )
-        
-        title_clip = ImageClip(title_img, duration=duration).with_position("center")
+        sub_clip = ImageClip(sub_img, duration=dur).with_position(("center", h // 2 + 50))
 
-        composite = CompositeVideoClip([bg, title_clip])
-        composite = composite.with_effects([vfx.FadeIn(0.5), vfx.FadeOut(0.5)])
+        # ─── Accent bar ───
+        bar = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        bar_d = ImageDraw.Draw(bar)
+        bar_color = (255, 215, 0, 220)
+        bar_d.rectangle([(w//2 - 120, h//2 + 95), (w//2 + 120, h//2 + 100)], fill=bar_color)
+        bar_clip = ImageClip(np.array(bar), duration=dur)
+
+        # ─── Sensor ring animation ───
+        ring_clips = []
+        for phase in range(3):
+            start_offset = phase * 0.3
+            ring_dur = dur - start_offset
+            if ring_dur <= 0:
+                continue
+            r_steps = max(1, int(ring_dur / 0.05))
+            step_d = ring_dur / r_steps
+            for rs in range(r_steps):
+                rp = rs / r_steps
+                ring_r = int(50 + rp * 500)
+                ring_alpha = int(max(0, 120 * (1 - rp)))
+                ring = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+                rd = ImageDraw.Draw(ring)
+                rd.ellipse(
+                    [(w//2 - ring_r, h//2 - ring_r), (w//2 + ring_r, h//2 + ring_r)],
+                    outline=(124, 58, 237, ring_alpha),
+                    width=2,
+                )
+                rc = ImageClip(np.array(ring), duration=step_d)
+                rc = rc.with_start(start_offset + rs * step_d)
+                ring_clips.append(rc)
+
+        elements = [bg, vignette_clip, author_clip, sub_clip, bar_clip] + corner_clips + ring_clips
+        composite = CompositeVideoClip(elements)
+        composite = composite.with_effects([vfx.FadeIn(0.5), vfx.FadeOut(0.8)])
 
         return composite
 
@@ -403,7 +559,7 @@ class VideoMontageMaker:
         section_durations = {}
         section_title_durations = {}
         section_titles = {
-            "intro": "Introduction",
+            "intro": self.post_author,
             "negatives": "Part One: The Negatives",
             "positives": "Part Two: The Positives",
             "improvements": "Part Three: How to Improve",
@@ -440,7 +596,7 @@ class VideoMontageMaker:
                 # --- Generate spoken audio for the section title ---
                 section_title_audio_text = section_titles[section_name]
                 if section_name == "intro":
-                    section_title_audio_text = "Bazooka Fried Chicken Social Media Analysis"
+                    section_title_audio_text = f"{self.post_author} Social Media Analysis"
                 title_segments = split_text_by_language(section_title_audio_text)
                 title_chunk_clips = []
                 for seg in title_segments:
@@ -519,7 +675,7 @@ class VideoMontageMaker:
             else:
                 title_dur = section_title_durations.get(section_name, 1.4)
                 if section_name == "intro":
-                    card = self.create_title_card("Bazooka Fried Chicken Social Media Analysis", duration=title_dur)
+                    card = self.create_intro_card(duration=title_dur)
                     clips.append(card)
                 else:
                     title_map = {
