@@ -26,3 +26,8 @@ export const checkVideoStatus = async () => {
     const res = await fetch('http://127.0.0.1:5001/api/video-status');
     return res.json();
 };
+
+export const checkVideoProgress = async () => {
+    const res = await fetch('http://127.0.0.1:5001/api/video-progress');
+    return res.json();
+};

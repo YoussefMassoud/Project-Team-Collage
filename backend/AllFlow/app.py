@@ -21,6 +21,17 @@ video_status = {
     "last_video_path": None
 }
 
+video_progress = {
+    "percent": 0,
+    "elapsed": 0,
+    "stage": "idle",
+    "frame": 0,
+    "total_frames": 0,
+    "speed": 0,
+    "stage_index": 0,
+    "total_stages": 5
+}
+
 BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def run_stage(folder_name, script_name, ignore_failure=False, extra_args=None):
@@ -54,6 +65,73 @@ def run_stage(folder_name, script_name, ignore_failure=False, extra_args=None):
         return False
     raise last_error
 
+def run_stage_stream(folder_name, script_name, ignore_failure=False, extra_args=None):
+    """Run a stage with streaming stdout to capture tqdm progress."""
+    global video_progress
+    cwd = os.path.join(BACKEND_DIR, folder_name)
+    python_exe = os.path.join(cwd, 'venv', 'Scripts', 'python.exe')
+    
+    stages_to_run = [python_exe, 'python'] if os.path.exists(python_exe) else ['python']
+    import re
+    
+    last_error = Exception(f"Failed to run {script_name} in {folder_name}")
+    for exe in stages_to_run:
+        cmd = [exe, script_name] + (extra_args or [])
+        print("\n" + "="*50, flush=True)
+        print(f"STREAMING STAGE START: {folder_name}", flush=True)
+        print(f"Command: {' '.join(cmd)}", flush=True)
+        print("="*50, flush=True)
+        
+        start_time = time.time()
+        try:
+            proc = subprocess.Popen(cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, encoding='utf-8')
+            
+            if proc.stdout is not None:
+                for line in iter(proc.stdout.readline, ''):
+                    line = line.rstrip()
+                    print(line, flush=True)
+                    
+                    # Parse tqdm progress
+                    m = re.search(r'frame_index:\s*\d+%\|\s*(\d+)/(\d+)', line)
+                    if m:
+                        frame = int(m.group(1))
+                        total = int(m.group(2))
+                        speed_m = re.search(r',\s*([\d.]+)it/s\]', line)
+                        speed = int(float(speed_m.group(1))) if speed_m else 0
+                        percent = int(frame / total * 100) if total > 0 else 0
+                        video_progress.update({
+                            "percent": percent,
+                            "frame": frame,
+                            "total_frames": total,
+                            "speed": speed,
+                            "stage": "rendering video"
+                        })
+                    
+                    m2 = re.search(r'\[TOTAL ELAPSED:\s*(\d+)s\]', line)
+                    if m2:
+                        video_progress.update({"elapsed": int(m2.group(1))})
+            else:
+                # Fallback: wait without streaming
+                proc.wait()
+            
+            if proc.returncode != 0:
+                raise Exception(f"Process exited with code {proc.returncode}")
+            
+            duration = time.time() - start_time
+            print("\n" + "-"*50, flush=True)
+            print(f"STAGE SUCCESS: {folder_name}", flush=True)
+            print(f"Duration: {duration:.2f}s", flush=True)
+            print("-"*50 + "\n", flush=True)
+            return True
+        except Exception as e:
+            print(f"FAILED attempt with {exe}: {e}", flush=True)
+            last_error = e
+            continue
+    
+    if ignore_failure:
+        return False
+    raise last_error
+
 def total_duration_logger(stop_event):
     start_time = time.time()
     while not stop_event.is_set():
@@ -62,26 +140,42 @@ def total_duration_logger(stop_event):
         time.sleep(10)
 
 def process_video_background(analyze_output, audio_dir, video_dir):
-    global video_status
+    global video_status, video_progress
     video_status["is_generating"] = True
+    progress_stages = ["audio processing", "preparing assets", "generating audio", "building scenes", "rendering video"]
+    video_progress.update({"percent": 0, "elapsed": 0, "stage": "starting", "frame": 0, "total_frames": 0, "speed": 0, "stage_index": 0, "total_stages": len(progress_stages)})
+    
     stop_logger = threading.Event()
     logger_thread = threading.Thread(target=total_duration_logger, args=(stop_logger,))
     logger_thread.start()
     
     pipeline_start = time.time()
+    stage_index = 0
     try:
+        # Stage 1: Audio processing
+        stage_index = 1
+        video_progress.update({"stage_index": stage_index, "stage": progress_stages[stage_index-1]})
         audio_input_txt = os.path.join(audio_dir, 'file.txt')
         shutil.copy2(analyze_output, audio_input_txt)
         run_stage('audioProessStage', 'audioProcessStage.py', ignore_failure=True)
+        video_progress.update({"percent": 15, "elapsed": round(time.time() - pipeline_start)})
         
-        audio_output = os.path.join(audio_dir, 'audio', 'output.mp3')
+        # Stage 2: Prepare assets
+        stage_index = 2
+        video_progress.update({"stage_index": stage_index, "stage": progress_stages[stage_index-1]})
+        audio_output_path = os.path.join(audio_dir, 'audio', 'output.mp3')
         video_assets_dir = os.path.join(video_dir, 'assets')
         os.makedirs(video_assets_dir, exist_ok=True)
         
-        if os.path.exists(audio_output):
-            shutil.copy2(audio_output, os.path.join(video_assets_dir, 'output.mp3'))
+        if os.path.exists(audio_output_path):
+            shutil.copy2(audio_output_path, os.path.join(video_assets_dir, 'output.mp3'))
         
         shutil.copy2(analyze_output, os.path.join(video_assets_dir, 'script.txt'))
+        video_progress.update({"percent": 25, "elapsed": round(time.time() - pipeline_start)})
+
+        # Stage 3: Audio generation (TTS)
+        stage_index = 3
+        video_progress.update({"stage_index": stage_index, "stage": progress_stages[stage_index-1]})
 
         # Auto-detect recorded narration files
         recorded_narrations = [
@@ -92,20 +186,23 @@ def process_video_background(analyze_output, audio_dir, video_dir):
         montage_args = ['--recorded'] if has_recorded else []
         if has_recorded:
             print("RECORDED NARRATION DETECTED: using your voice instead of gTTS")
-        run_stage('motageVideoStage', 'app.py', ignore_failure=True, extra_args=montage_args)
+        
+        video_progress.update({"percent": 35, "elapsed": round(time.time() - pipeline_start)})
 
-        # Recorded narration mode: if prerecorded audio files exist in assets,
-        # the montage builder will detect them and use your voice instead of gTTS.
-        # Place intro_narration.mp3, negatives_narration.mp3, positives_narration.mp3,
-        # improvements_narration.mp3 in backend/motageVideoStage/assets/
+        # Stage 4-5: Montage (scene building + rendering)
+        stage_index = 4
+        video_progress.update({"stage_index": stage_index, "stage": progress_stages[stage_index-1]})
+        run_stage_stream('motageVideoStage', 'app.py', ignore_failure=True, extra_args=montage_args)
         
         video_path = os.path.join(video_dir, 'output', 'final_montage.mp4')
         if os.path.exists(video_path):
             video_status["last_video_path"] = video_path
             total_time = time.time() - pipeline_start
+            video_progress.update({"percent": 100, "elapsed": round(total_time), "stage": "complete", "stage_index": len(progress_stages)})
             print(f"!!! COMPLETE !!! All stages finished in {total_time:.2f}s. Video saved to {video_path}")
     except Exception as e:
         print(f"!!! CRITICAL FAILURE in pipeline: {e}", flush=True)
+        video_progress.update({"stage": f"error: {str(e)[:50]}"})
     finally:
         stop_logger.set()
         video_status["is_generating"] = False
@@ -197,6 +294,17 @@ def get_video_status():
     return jsonify({
         "ready": ready,
         "generating": video_status["is_generating"]
+    })
+
+@app.route('/api/video-progress', methods=['GET'])
+def get_video_progress():
+    global video_progress
+    video_path = os.path.join(BACKEND_DIR, 'motageVideoStage', 'output', 'final_montage.mp4')
+    ready = os.path.exists(video_path)
+    return jsonify({
+        **video_progress,
+        "ready": ready,
+        "generating": video_status.get("is_generating", False)
     })
 
 @app.route('/api/fetch-post', methods=['POST'])
