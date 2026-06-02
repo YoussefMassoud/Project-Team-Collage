@@ -3,12 +3,57 @@ from moviepy import (
     AudioFileClip,
     CompositeVideoClip,
     concatenate_videoclips,
+    concatenate_audioclips,
     ColorClip,
 )
 import moviepy.video.fx as vfx
 import os
+import sys
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
+from gtts import gTTS
+import uuid
+
+def is_arabic(char):
+    return '\u0600' <= char <= '\u06FF'
+
+def is_english(char):
+    return 'a' <= char.lower() <= 'z'
+
+def split_text_by_language(text):
+    segments = []
+    if not text:
+        return segments
+
+    current_lang = None
+    current_text = []
+
+    for char in text:
+        if is_arabic(char):
+            char_lang = 'ar'
+        elif is_english(char):
+            char_lang = 'en'
+        else:
+            char_lang = 'neutral'
+
+        if char_lang == 'neutral':
+            current_text.append(char)
+        else:
+            if current_lang is None:
+                current_lang = char_lang
+                current_text.append(char)
+            elif char_lang == current_lang:
+                current_text.append(char)
+            else:
+                segments.append({'text': "".join(current_text), 'lang': current_lang})
+                current_text = [char]
+                current_lang = char_lang
+
+    if current_text:
+        lang = current_lang if current_lang else 'en'
+        segments.append({'text': "".join(current_text), 'lang': lang})
+
+    return segments
 
 
 class VideoMontageMaker:
@@ -97,19 +142,10 @@ class VideoMontageMaker:
             color=(255, 255, 255),
             max_width=self.video_size[0] - 200,
         )
-        shadow_img = self.create_text_image(
-            title, font_size=80, color=(0, 0, 0), max_width=self.video_size[0] - 200
-        )
-        shadow_clip = ImageClip(shadow_img, duration=duration).with_position(
-            lambda t: (
-                self.video_size[0] // 2 - shadow_img.shape[1] // 2 + 3,
-                self.video_size[1] // 2 - shadow_img.shape[0] // 2 + 3,
-            )
-        )
-
+        
         title_clip = ImageClip(title_img, duration=duration).with_position("center")
 
-        composite = CompositeVideoClip([bg, shadow_clip, title_clip])
+        composite = CompositeVideoClip([bg, title_clip])
         composite = composite.with_effects([vfx.FadeIn(0.5), vfx.FadeOut(0.5)])
 
         return composite
@@ -178,30 +214,15 @@ class VideoMontageMaker:
             max_width=video_size[0] - 300,
         )
 
-        shadow_img = self.create_text_image(
-            text.upper(),
-            font_size=65,
-            color=(0, 0, 0),
-            bg_color=None,
-            max_width=video_size[0] - 300,
-        )
-
-        shadow_clip = (
-            ImageClip(shadow_img, duration=duration)
-            .with_position(("center", video_size[1] // 2 + 5))
-            .with_start(start_time)
-            .with_opacity(0.6)  # type: ignore
-        )
-
         txt_clip = (
             ImageClip(subtitle_img, duration=duration)
             .with_position("center")
             .with_start(start_time)
         )
 
-        return [shadow_clip, txt_clip]
+        return [txt_clip]
 
-    def create_image_clip_with_zoom(self, image_path, duration, text=None):
+    def create_image_clip_with_zoom(self, image_path, duration):
         img_clip = ImageClip(image_path, duration=duration)
 
         w_ratio = self.video_size[0] / img_clip.w  # type: ignore
@@ -216,16 +237,6 @@ class VideoMontageMaker:
             height=self.video_size[1]
         )])
         img_clip = img_clip.with_position("center")  # type: ignore
-
-        if text:
-            text_img = self.create_text_image(
-                text, font_size=45, color=(255, 255, 255),
-                bg_color=(0, 0, 0, 180), max_width=self.video_size[0] - 200,
-            )
-            text_clip = ImageClip(text_img, duration=duration).with_position(
-                ("center", self.video_size[1] - text_img.shape[0] - 60)
-            )
-            return CompositeVideoClip([img_clip, text_clip])
 
         return img_clip
 
@@ -251,9 +262,43 @@ class VideoMontageMaker:
 
         return sections
 
-    def create_montage(self):
+    def _recorded_audio_paths(self):
+        paths = {}
+        for name in ["intro", "negatives", "positives", "improvements"]:
+            p = os.path.join(self.assets_path, f"{name}_narration.mp3")
+            if os.path.exists(p):
+                paths[name] = p
+        return paths
+
+    def generate_recording_guide(self):
+        script_path = os.path.join(self.assets_path, "script.txt")
+        sections = self.parse_script(script_path)
+        labels = {
+            "intro": "Introduction",
+            "negatives": "Part One: The Negatives",
+            "positives": "Part Two: The Positives",
+            "improvements": "Part Three: How to Improve",
+        }
+        print("\n" + "=" * 60)
+        print("RECORDING GUIDE")
+        print("=" * 60)
+        print("Record 4 separate MP3 files and place them in 'assets/':")
+        print()
+        for name in ["intro", "negatives", "positives", "improvements"]:
+            text = sections.get(name, "").strip()
+            if not text:
+                continue
+            filename = f"{name}_narration.mp3"
+            print(f"  File: {filename}")
+            print(f"  Say:  {labels[name]}. {text}")
+            print(f"       (speak naturally, include the section title)")
+            print()
+        print("The video timing will match your recording exactly.")
+        print("No gTTS will be used. No sync delays.")
+        print("=" * 60)
+
+    def create_montage(self, recorded_mode=False):
         print("Starting video creation...")
-        audio_path = os.path.join(self.assets_path, "output.mp3")
         script_path = os.path.join(self.assets_path, "script.txt")
 
         images = {
@@ -262,146 +307,143 @@ class VideoMontageMaker:
             "positives": os.path.join(self.assets_path, "positive.png"),
             "improvements": os.path.join(self.assets_path, "How to improved.png"),
         }
-        audio = AudioFileClip(audio_path)
-        total_duration = audio.duration or 0.0
         sections = self.parse_script(script_path)
-        title_card_duration = 1.4
-
         content_sections = ["intro", "negatives", "positives", "improvements"]
-        word_counts = {sec: len(sections[sec].split()) for sec in content_sections}
-        total_words = sum(word_counts.values())
 
-        if total_words == 0:
-            total_words = 1
-            word_counts = {sec: 1 for sec in content_sections}
+        recorded_audio = self._recorded_audio_paths()
+        has_all_recorded = len(recorded_audio) == len(content_sections)
+        use_recorded = recorded_mode and has_all_recorded
 
-        remaining_time = total_duration - (4 * title_card_duration)
+        if recorded_mode and not has_all_recorded:
+            missing = [s for s in content_sections if s not in recorded_audio]
+            print(f"WARNING: Recorded mode but missing: {missing}")
+            self.generate_recording_guide()
 
-        t: float = 0
-        timings: dict[str, tuple[float, float]] = {}
+        if use_recorded:
+            print("RECORDED MODE: using your voice narration")
+        else:
+            print("TTS MODE: generating synthetic speech")
 
-        timings["intro_title"] = (t, t + title_card_duration)
-        t += title_card_duration
-        intro_dur = (word_counts["intro"] / total_words) * remaining_time
-        timings["intro"] = (t, t + intro_dur)
-        t += intro_dur
-
-        timings["negatives_title"] = (t, t + title_card_duration)
-        t += title_card_duration
-        neg_dur = (word_counts["negatives"] / total_words) * remaining_time
-        timings["negatives"] = (t, t + neg_dur)
-        t += neg_dur
-
-        timings["positives_title"] = (t, t + title_card_duration)
-        t += title_card_duration
-        pos_dur = (word_counts["positives"] / total_words) * remaining_time
-        timings["positives"] = (t, t + pos_dur)
-        t += pos_dur
-
-        timings["improvements_title"] = (t, t + title_card_duration)
-        t += title_card_duration
-        timings["improvements"] = (t, total_duration)
-
-        clips = []
-
-        print("Creating intro title...")
-        intro_title = self.create_title_card(
-            "Bazooka Fried Chicken Social Media Analysis",
-            duration=timings["intro_title"][1] - timings["intro_title"][0],
-        )
-        clips.append(intro_title)
-
-        print("Creating intro section...")
-        intro_clip = self.create_image_clip_with_zoom(
-            images["intro"],
-            duration=timings["intro"][1] - timings["intro"][0],
-            text=sections["intro"],
-        )
-        intro_clip = intro_clip.with_effects([vfx.FadeIn(1), vfx.FadeOut(1)])
-        clips.append(intro_clip)
-        print("Creating negatives section...")
-        neg_title = self.create_section_title(
-            "Part One",
-            "The Negatives",
-            duration=timings["negatives_title"][1] - timings["negatives_title"][0],
-            image_path=images["negatives"],
-        )
-        clips.append(neg_title)
-
-        neg_clip = self.create_image_clip_with_zoom(
-            images["negatives"],
-            duration=timings["negatives"][1] - timings["negatives"][0],
-            text=sections["negatives"],
-        )
-        neg_clip = neg_clip.with_effects([vfx.FadeIn(1), vfx.FadeOut(1)])
-        clips.append(neg_clip)
-        print("Creating positives section...")
-        pos_title = self.create_section_title(
-            "Part Two",
-            "The Positives",
-            duration=timings["positives_title"][1] - timings["positives_title"][0],
-            image_path=images["positives"],
-        )
-        clips.append(pos_title)
-
-        pos_clip = self.create_image_clip_with_zoom(
-            images["positives"],
-            duration=timings["positives"][1] - timings["positives"][0],
-            text=sections["positives"],
-        )
-        pos_clip = pos_clip.with_effects([vfx.FadeIn(1), vfx.FadeOut(1)])
-        clips.append(pos_clip)
-        print("Creating improvements section...")
-        imp_title = self.create_section_title(
-            "Part Three",
-            "How to Improve",
-            duration=timings["improvements_title"][1]
-            - timings["improvements_title"][0],
-            image_path=images["improvements"],
-        )
-        clips.append(imp_title)
-
-        imp_clip = self.create_image_clip_with_zoom(
-            images["improvements"],
-            duration=timings["improvements"][1] - timings["improvements"][0],
-            text=sections["improvements"],
-        )
-        imp_clip = imp_clip.with_effects([vfx.FadeIn(1), vfx.FadeOut(1)])
-        clips.append(imp_clip)
-        print("Concatenating clips...")
-        final_video = concatenate_videoclips(clips, method="compose")
-        print("Adding audio...")
-        final_video = final_video.with_audio(audio)
-        print("Adding subtitles...")
         subtitle_clips = []
+        audio_clips = []
+        temp_audio_files = []
+
+        # Phase 1: compute all timings and collect audio
+        section_audios = {}
+        section_durations = {}
+        t = 0.0
 
         for section_name in content_sections:
-            start_t, end_t = timings[section_name]
+            text = sections[section_name].strip()
+            if not text:
+                section_durations[section_name] = 0.1
+                section_audios[section_name] = None
+                t += 0.1
+                continue
+
+            if use_recorded:
+                ac = AudioFileClip(recorded_audio[section_name])
+                d = ac.duration
+                if d is None:
+                    print(f"WARNING: Could not read duration from {recorded_audio[section_name]}, using 3.0s fallback")
+                    d = 3.0
+                section_audios[section_name] = ac
+                section_durations[section_name] = d
+                audio_clips.append(ac)
+
+                labels = {
+                    "intro": "Introduction",
+                    "negatives": "Part One: The Negatives",
+                    "positives": "Part Two: The Positives",
+                    "improvements": "Part Three: How to Improve",
+                }
+                subtitle_text = f"{labels[section_name]}\n{text}"
+                subtitle_clips.extend(
+                    self.add_subtitle(subtitle_text, t, t + d, self.video_size)
+                )
+                t += d
+            else:
+                words = text.split()
+                chunk_size = 7
+                chunks = [" ".join(words[i:i+chunk_size]) for i in range(0, len(words), chunk_size)]
+                section_start = t
+                for chunk_text in chunks:
+                    if not chunk_text.strip():
+                        continue
+                    segments = split_text_by_language(chunk_text)
+                    chunk_clips = []
+                    for seg in segments:
+                        if not seg['text'].strip():
+                            continue
+                        try:
+                            tts = gTTS(text=seg['text'], lang=seg['lang'])
+                            tmp = os.path.join(self.output_path, f"temp_seg_{uuid.uuid4().hex}.mp3")
+                            tts.save(tmp)
+                            temp_audio_files.append(tmp)
+                            chunk_clips.append(AudioFileClip(tmp))
+                        except Exception as e:
+                            print(f"Error generating audio for segment: {e}")
+                    if not chunk_clips:
+                        continue
+                    chunk_audio = concatenate_audioclips(chunk_clips) if len(chunk_clips) > 1 else chunk_clips[0]
+                    audio_clips.append(chunk_audio)
+                    d = chunk_audio.duration
+                    if d is None:
+                        d = len(chunk_text.split()) * 0.25
+                    subtitle_clips.extend(self.add_subtitle(chunk_text, t, t + d, self.video_size))
+                    t += d
+                section_durations[section_name] = t - section_start
+                section_audios[section_name] = None
+
+        final_audio = concatenate_audioclips(audio_clips) if audio_clips else None
+
+        # Phase 2: build video clips
+        clips = []
+        for section_name in content_sections:
             text = sections[section_name].strip()
             if not text:
                 continue
 
-            words = text.split()
-            chunk_size = 7
-            chunks = [" ".join(words[i:i+chunk_size]) for i in range(0, len(words), chunk_size)]
+            dur = section_durations.get(section_name, 1.0)
 
-            section_dur = end_t - start_t
-            if not chunks:
-                continue
+            if use_recorded:
+                # No title cards; narration includes the title
+                clip = self.create_image_clip_with_zoom(images[section_name], dur)
+                clip = clip.with_effects([vfx.FadeIn(1), vfx.FadeOut(1)])
+                clips.append(clip)
+            else:
+                # Title card + content image (original style)
+                # dur = content audio duration (gTTS chunks, excludes title card)
+                if section_name == "intro":
+                    card = self.create_title_card("Bazooka Fried Chicken Social Media Analysis", duration=1.4)
+                    clips.append(card)
+                    img = self.create_image_clip_with_zoom(images[section_name], dur)
+                    img = img.with_effects([vfx.FadeIn(1), vfx.FadeOut(1)])
+                    clips.append(img)
+                else:
+                    title_map = {
+                        "negatives": ("Part One", "The Negatives"),
+                        "positives": ("Part Two", "The Positives"),
+                        "improvements": ("Part Three", "How to Improve"),
+                    }
+                    title_text, sub_text = title_map[section_name]
+                    card = self.create_section_title(title_text, sub_text, duration=1.4, image_path=images[section_name])
+                    clips.append(card)
+                    img = self.create_image_clip_with_zoom(images[section_name], dur)
+                    img = img.with_effects([vfx.FadeIn(1), vfx.FadeOut(1)])
+                    clips.append(img)
 
-            chunk_dur = section_dur / len(chunks)
+        print("Concatenating clips...")
+        final_video = concatenate_videoclips(clips, method="compose")
 
-            for i, chunk_text in enumerate(chunks):
-                offset = 0.15
-                c_start = max(0, start_t + (i * chunk_dur) - offset)
-                c_end = min(end_t, c_start + chunk_dur)
+        if final_audio:
+            print("Adding audio...")
+            final_video = final_video.with_audio(final_audio)
 
-                subtitle_clips.extend(
-                    self.add_subtitle(chunk_text, c_start, c_end, self.video_size)
-                )
-
+        print("Adding subtitles...")
         if subtitle_clips:
             final_video = CompositeVideoClip([final_video] + subtitle_clips)
+
         output_file = os.path.join(self.output_path, "final_montage.mp4")
         print(f"Exporting video to {output_file}...")
 
@@ -416,10 +458,25 @@ class VideoMontageMaker:
             preset="medium",
         )
 
+        for f in temp_audio_files:
+            try:
+                os.remove(f)
+            except:
+                pass
+
         print(f"Video created successfully: {output_file}")
         return output_file
 
 
 if __name__ == "__main__":
+    recorded_mode = "--recorded" in sys.argv
+
+    if "--guide" in sys.argv:
+        maker = VideoMontageMaker()
+        maker.generate_recording_guide()
+        sys.exit(0)
+
     maker = VideoMontageMaker()
-    maker.create_montage()
+    if recorded_mode:
+        print("RECORDED MODE from command line")
+    maker.create_montage(recorded_mode=recorded_mode)

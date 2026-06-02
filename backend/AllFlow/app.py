@@ -23,7 +23,7 @@ video_status = {
 
 BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-def run_stage(folder_name, script_name, ignore_failure=False):
+def run_stage(folder_name, script_name, ignore_failure=False, extra_args=None):
     cwd = os.path.join(BACKEND_DIR, folder_name)
     python_exe = os.path.join(cwd, 'venv', 'Scripts', 'python.exe')
     
@@ -32,12 +32,13 @@ def run_stage(folder_name, script_name, ignore_failure=False):
     start_time = time.time()
     last_error = Exception(f"Failed to run {script_name} in {folder_name}")
     for exe in stages_to_run:
+        cmd = [exe, script_name] + (extra_args or [])
         print("\n" + "="*50, flush=True)
         print(f"STAGE START: {folder_name}", flush=True)
-        print(f"Script: {script_name}", flush=True)
+        print(f"Command: {' '.join(cmd)}", flush=True)
         print("="*50, flush=True)
         try:
-            subprocess.run([exe, script_name], cwd=cwd, check=True)
+            subprocess.run(cmd, cwd=cwd, check=True)
             duration = time.time() - start_time
             print("\n" + "-"*50, flush=True)
             print(f"STAGE SUCCESS: {folder_name}", flush=True)
@@ -81,7 +82,22 @@ def process_video_background(analyze_output, audio_dir, video_dir):
             shutil.copy2(audio_output, os.path.join(video_assets_dir, 'output.mp3'))
         
         shutil.copy2(analyze_output, os.path.join(video_assets_dir, 'script.txt'))
-        run_stage('motageVideoStage', 'app.py', ignore_failure=True)
+
+        # Auto-detect recorded narration files
+        recorded_narrations = [
+            os.path.join(video_assets_dir, f"{name}_narration.mp3")
+            for name in ["intro", "negatives", "positives", "improvements"]
+        ]
+        has_recorded = all(os.path.exists(p) for p in recorded_narrations)
+        montage_args = ['--recorded'] if has_recorded else []
+        if has_recorded:
+            print("RECORDED NARRATION DETECTED: using your voice instead of gTTS")
+        run_stage('motageVideoStage', 'app.py', ignore_failure=True, extra_args=montage_args)
+
+        # Recorded narration mode: if prerecorded audio files exist in assets,
+        # the montage builder will detect them and use your voice instead of gTTS.
+        # Place intro_narration.mp3, negatives_narration.mp3, positives_narration.mp3,
+        # improvements_narration.mp3 in backend/motageVideoStage/assets/
         
         video_path = os.path.join(video_dir, 'output', 'final_montage.mp4')
         if os.path.exists(video_path):
