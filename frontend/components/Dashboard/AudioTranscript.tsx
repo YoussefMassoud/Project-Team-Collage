@@ -1,6 +1,5 @@
 "use client";
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Play, Pause, StopCircle, Volume2 } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface AudioTranscriptProps {
@@ -96,76 +95,6 @@ export default function AudioTranscript({ issues, suggestions, sentiment }: Audi
 
   return (
     <div style={{ marginTop: "20px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "15px" }}>
-        <Volume2 size={16} style={{ opacity: 0.5 }} />
-        <span style={{ fontSize: "0.85rem", opacity: 0.6, flex: 1 }}>Audio Narration</span>
-
-        <div style={{ display: "flex", gap: "8px" }}>
-          {state === "idle" || state === "paused" ? (
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={play}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                background: state === "paused" ? "var(--card-bg)" : "var(--accent)",
-                color: state === "paused" ? "var(--foreground)" : "#000",
-                border: "1px solid var(--card-border)",
-                padding: "8px 16px",
-                borderRadius: "8px",
-                cursor: "pointer",
-                fontWeight: 600,
-                fontSize: "0.85rem",
-              }}
-            >
-              <Play size={14} fill={state === "paused" ? "currentColor" : "#000"} />
-              {state === "paused" ? "Resume" : "Listen"}
-            </motion.button>
-          ) : (
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={pause}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                background: "var(--card-bg)",
-                color: "var(--foreground)",
-                border: "1px solid var(--card-border)",
-                padding: "8px 16px",
-                borderRadius: "8px",
-                cursor: "pointer",
-                fontWeight: 600,
-                fontSize: "0.85rem",
-              }}
-            >
-              <Pause size={14} /> Pause
-            </motion.button>
-          )}
-          {state !== "idle" && (
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={stop}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                background: "transparent",
-                color: "var(--foreground)",
-                opacity: 0.6,
-                border: "1px solid var(--card-border)",
-                padding: "8px 12px",
-                borderRadius: "8px",
-                cursor: "pointer",
-                fontSize: "0.85rem",
-              }}
-            >
-              <StopCircle size={14} />
-            </motion.button>
-          )}
-        </div>
-      </div>
 
       <div
         ref={containerRef}

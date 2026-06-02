@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import StatsCard from "@/components/Dashboard/StatsCard";
 import SentimentChart from "@/components/Dashboard/SentimentChart";
-import AudioTranscript from "@/components/Dashboard/AudioTranscript";
+
 import VideoProgress from "@/components/Dashboard/VideoProgress";
 import { ThumbsUp, MessageCircle, Share2, AlertTriangle, CheckCircle, FileVideo, ArrowRight } from "lucide-react";
 import { checkVideoStatus } from "@/api";
@@ -144,7 +144,7 @@ export default function Dashboard() {
               </ul>
             </div>
 
-            <AudioTranscript issues={analysis?.issues || []} suggestions={analysis?.suggestions || []} sentiment={analysis?.sentiment} />
+
           </motion.div>
 
           {/* CTA card: AI Video Report */}

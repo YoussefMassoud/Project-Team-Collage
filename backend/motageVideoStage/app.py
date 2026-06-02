@@ -468,13 +468,10 @@ class VideoMontageMaker:
             dur = section_durations.get(section_name, 1.0)
 
             if use_recorded:
-                # No title cards; narration includes the title
                 clip = self.create_image_clip_with_zoom(images[section_name], dur)
                 clip = clip.with_effects([vfx.FadeIn(1), vfx.FadeOut(1)])
                 clips.append(clip)
             else:
-                # Title card + content image
-                # Title card duration matches the spoken title audio
                 title_dur = section_title_durations.get(section_name, 1.4)
                 if section_name == "intro":
                     card = self.create_title_card("Bazooka Fried Chicken Social Media Analysis", duration=title_dur)
