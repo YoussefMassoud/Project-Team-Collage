@@ -253,6 +253,44 @@ class VideoMontageMaker:
 
         return [txt_clip]
 
+    def add_section_label_overlay(self, label, start_time, duration, video_size):
+        bar_height = 60
+        bar = np.zeros((bar_height, video_size[0], 4), dtype=np.uint8)
+        bar[:, :, :3] = (10, 10, 30)
+        bar[:, :, 3] = 200
+
+        overlay_img = Image.new("RGBA", (video_size[0], bar_height), (0, 0, 0, 0))
+        overlay_draw = ImageDraw.Draw(overlay_img)
+        font = self.load_best_font(28, bold=True)
+        label_text = label.upper()
+        bbox = overlay_draw.textbbox((0, 0), label_text, font=font)
+        text_x = 30
+        text_y = (bar_height - (bbox[3] - bbox[1])) // 2
+        overlay_draw.text((text_x + 1, text_y + 1), label_text, font=font, fill=(0, 0, 0, 180))
+        overlay_draw.text((text_x, text_y), label_text, font=font, fill=(180, 180, 255))
+
+        overlay_np = np.array(overlay_img)
+        bar_with_text = bar.copy()
+        text_mask = overlay_np[:, :, 3] > 0
+        bar_with_text[text_mask] = overlay_np[text_mask]
+
+        bar_clip = (
+            ImageClip(bar_with_text, duration=duration)
+            .with_position(("center", video_size[1] - bar_height))
+            .with_start(start_time)
+        )
+
+        accent_line = np.zeros((3, video_size[0], 4), dtype=np.uint8)
+        accent_line[:, :, :3] = (124, 58, 237)
+        accent_line[:, :, 3] = 255
+        line_clip = (
+            ImageClip(accent_line, duration=duration)
+            .with_position(("center", video_size[1] - bar_height - 3))
+            .with_start(start_time)
+        )
+
+        return [bar_clip, line_clip]
+
     def create_image_clip_with_zoom(self, image_path, duration):
         img_clip = ImageClip(image_path, duration=duration)
 
@@ -358,6 +396,7 @@ class VideoMontageMaker:
         subtitle_clips = []
         audio_clips = []
         temp_audio_files = []
+        label_overlay_clips = []
 
         # Phase 1: compute all timings and collect audio
         section_audios = {}
@@ -392,6 +431,9 @@ class VideoMontageMaker:
                 subtitle_text = f"{section_titles[section_name]}\n{text}"
                 subtitle_clips.extend(
                     self.add_subtitle(subtitle_text, t, t + d, self.video_size)
+                )
+                label_overlay_clips.extend(
+                    self.add_section_label_overlay(section_titles[section_name], t, d, self.video_size)
                 )
                 t += d
             else:
@@ -455,6 +497,9 @@ class VideoMontageMaker:
                     t += d
                 section_durations[section_name] = t - section_start
                 section_audios[section_name] = None
+                label_overlay_clips.extend(
+                    self.add_section_label_overlay(section_titles[section_name], section_start, t - section_start, self.video_size)
+                )
 
         final_audio = concatenate_audioclips(audio_clips) if audio_clips else None
 
@@ -497,8 +542,8 @@ class VideoMontageMaker:
             final_video = final_video.with_audio(final_audio)
 
         print("Adding subtitles...")
-        if subtitle_clips:
-            final_video = CompositeVideoClip([final_video] + subtitle_clips)
+        if subtitle_clips or label_overlay_clips:
+            final_video = CompositeVideoClip([final_video] + subtitle_clips + label_overlay_clips)
 
         output_file = os.path.join(self.output_path, "final_montage.mp4")
         print(f"Exporting video to {output_file}...")
