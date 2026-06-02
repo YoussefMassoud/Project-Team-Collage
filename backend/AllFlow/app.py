@@ -6,7 +6,6 @@ import threading
 import time
 import sys
 
-# Force UTF-8 encoding for standard output (Fixes Windows charmap errors)
 if sys.stdout.encoding != 'utf-8':
     import io
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
@@ -17,7 +16,6 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
-# Track video generation status
 video_status = {
     "is_generating": False,
     "last_video_path": None
@@ -71,12 +69,10 @@ def process_video_background(analyze_output, audio_dir, video_dir):
     
     pipeline_start = time.time()
     try:
-        # 1. Run Audio Stage
         audio_input_txt = os.path.join(audio_dir, 'file.txt')
         shutil.copy2(analyze_output, audio_input_txt)
         run_stage('audioProessStage', 'audioProcessStage.py', ignore_failure=True)
         
-        # 2. Run Video Stage
         audio_output = os.path.join(audio_dir, 'audio', 'output.mp3')
         video_assets_dir = os.path.join(video_dir, 'assets')
         os.makedirs(video_assets_dir, exist_ok=True)
@@ -113,7 +109,6 @@ def run_all_flow():
             if os.path.exists(source_json):
                 shutil.copy2(source_json, dest_json)
             
-        # 2. Run AnalyzeHumanStage (FAST PATH)
         run_stage('AnalyzeHumanStage', 'AnalyzeHumanStage.py', ignore_failure=True)
         
         analyze_output = os.path.join(analyze_dir, 'file.txt')
@@ -122,10 +117,8 @@ def run_all_flow():
             with open(analyze_output, 'w', encoding='utf-8') as f:
                 f.write(fallback_text)
 
-        # 3. Trigger Video Generation in BACKGROUND
         threading.Thread(target=process_video_background, args=(analyze_output, audio_dir, video_dir)).start()
         
-        # 4. Return analysis data IMMEDIATELY
         analysis_result = {
             "topics": ["Customer Service", "Pricing", "Discount"],
             "pros": [
@@ -157,7 +150,6 @@ def run_all_flow():
             "video_ready": False 
         }
         
-        # 5. Success message to console
         print("\n" + "╔" + "═"*58 + "╗")
         print("║" + " ANALYSIS COMPLETE ".center(58) + "║")
         print("╚" + "═"*58 + "╝")

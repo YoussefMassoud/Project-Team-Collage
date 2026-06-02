@@ -1,0 +1,12 @@
+[tool.pyrefly]
+python_interpreter = "backend/AllFlow/venv/Scripts/python.exe"
+type_checking_mode = "basic"
+search_path = [
+    "backend/motageVideoStage",
+    "backend/audioProessStage",
+    "backend/AnalyzeHumanStage",
+]
+
+[tool.pyright]
+venvPath = "backend/AllFlow"
+venv = "venv"

@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 from gtts import gTTS
 from io import BytesIO
 
-# Load environment variables
 load_dotenv()
 
 API_KEY = os.getenv("GEMINI_API_KEY")
@@ -15,7 +14,6 @@ if not API_KEY:
     print("Please check your .env file.")
     exit(1)
 
-# --- Helper Functions for Audio (from audioProessStage) ---
 def is_arabic(char):
     return '\u0600' <= char <= '\u06FF'
 
@@ -27,7 +25,7 @@ def split_text_by_language(text):
     if not text:
         return segments
 
-    current_lang = None  # 'ar' or 'en'
+    current_lang = None
     current_text = []
 
     for char in text:
@@ -47,7 +45,6 @@ def split_text_by_language(text):
             elif char_lang == current_lang:
                 current_text.append(char)
             else:
-                # Switch detected
                 segments.append({'text': "".join(current_text), 'lang': current_lang})
                 current_text = [char]
                 current_lang = char_lang
@@ -86,19 +83,15 @@ def text_to_audio(text, output_path):
     except Exception as e:
         print(f"Error saving audio file: {e}")
 
-# --- Main Analysis Function ---
 def analyze_json_with_gemini(json_file_path, output_file_path, audio_file_path):
     try:
-        # Read JSON
         with open(json_file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
         json_str = json.dumps(data, indent=2, ensure_ascii=False)
 
-        # Configure Gemini
         genai.configure(api_key=API_KEY)
         
-        # Using a model confirmed to be available
         model = genai.GenerativeModel('gemini-2.0-flash')
 
         prompt = f"""
@@ -123,18 +116,14 @@ def analyze_json_with_gemini(json_file_path, output_file_path, audio_file_path):
         response = model.generate_content(prompt)
         analysis_text = response.text
 
-        # Add Intro
         post_author = data.get("post_author", "Client")
         intro = f"Hello {post_author}, in this video we will summarize your post data in three parts.\n\n"
         full_analysis = intro + analysis_text
 
-        # Save Text
         with open(output_file_path, 'w', encoding='utf-8') as f:
             f.write(full_analysis)
         print(f"Analysis text saved to {output_file_path}")
 
-        # Generate Audio (Disabled per user request)
-        # text_to_audio(analysis_text, audio_file_path)
 
     except Exception as e:
         print(f"An error occurred: {e}")

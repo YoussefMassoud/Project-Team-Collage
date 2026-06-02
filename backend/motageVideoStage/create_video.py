@@ -1,21 +1,3 @@
-"""
-Video Montage Creator
-This script creates a professional video montage from images, audio, and script.
-
-Features:
-- Intro title card
-- 4 main sections with title cards
-- Smooth transitions (fade in/out)
-- Styled subtitles with semi-transparent backgrounds
-- Gradient backgrounds for section titles
-- Professional fonts and styling
-
-Usage:
-    python app.py
-
-Output:
-    output/final_montage.mp4
-"""
 
 from app import VideoMontageMaker
 

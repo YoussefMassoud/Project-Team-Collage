@@ -13,7 +13,7 @@ def split_text_by_language(text):
     if not text:
         return segments
 
-    current_lang = None  # 'ar' or 'en'
+    current_lang = None
     current_text = []
 
     for char in text:
@@ -33,15 +33,11 @@ def split_text_by_language(text):
             elif char_lang == current_lang:
                 current_text.append(char)
             else:
-                # Switch detected
-                # Save previous segment
                 segments.append({'text': "".join(current_text), 'lang': current_lang})
-                # Start new
                 current_text = [char]
                 current_lang = char_lang
 
     if current_text:
-        # Default to 'en' if still None (e.g. all numbers), or keep current
         lang = current_lang if current_lang else 'en'
         segments.append({'text': "".join(current_text), 'lang': lang})
 
@@ -75,8 +71,6 @@ def process_tts(input_file, output_folder):
         seg_text = seg['text']
         seg_lang = seg['lang']
         
-        # Skip empty or whitespace-only segments if they don't add value, 
-        # but sometimes pauses are good. gTTS might fail on empty.
         if not seg_text.strip():
             continue
 
@@ -84,7 +78,6 @@ def process_tts(input_file, output_folder):
         
         try:
             tts = gTTS(text=seg_text, lang=seg_lang)
-            # Write to memory
             fp = BytesIO()
             tts.write_to_fp(fp)
             fp.seek(0)

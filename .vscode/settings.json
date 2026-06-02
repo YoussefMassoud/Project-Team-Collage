@@ -1,0 +1,9 @@
+{
+  "python.defaultInterpreterPath": "D:\\youssef2\\Project-Team-Collage\\backend\\AllFlow\\venv\\Scripts\\python.exe",
+  "python.terminal.activateEnvironment": true,
+  "python.analysis.extraPaths": [
+    "D:\\youssef2\\Project-Team-Collage\\backend\\AllFlow\\venv\\Lib\\site-packages"
+  ],
+  "python.analysis.typeCheckingMode": "basic",
+  "python.analysis.useLibraryCodeForTypes": true
+}
