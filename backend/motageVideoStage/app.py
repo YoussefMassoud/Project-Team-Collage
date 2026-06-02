@@ -66,6 +66,34 @@ class VideoMontageMaker:
         self.video_size = (1920, 1080)
         self.fps = 30
 
+    def load_best_font(self, font_size, bold=False):
+        """Try modern system fonts in priority order, fall back gracefully."""
+        if bold:
+            candidates = [
+                "bahnschrift.ttf",
+                "segoeuib.ttf",
+                "calibrib.ttf",
+                "Candarab.ttf",
+                "trebucbd.ttf",
+                "arialbd.ttf",
+                "arial.ttf",
+            ]
+        else:
+            candidates = [
+                "bahnschrift.ttf",
+                "segoeui.ttf",
+                "calibri.ttf",
+                "Candara.ttf",
+                "trebuc.ttf",
+                "arial.ttf",
+            ]
+        for name in candidates:
+            try:
+                return ImageFont.truetype(name, font_size)
+            except (OSError, IOError):
+                continue
+        return ImageFont.load_default()
+
     def create_text_image(
         self,
         text,
@@ -74,14 +102,10 @@ class VideoMontageMaker:
         bg_color=None,
         max_width=1600,
         align="center",
+        bold=False,
+        shadow=True,
     ):
-        try:
-            font = ImageFont.truetype("arialbd.ttf", font_size)
-        except (OSError, IOError):
-            try:
-                font = ImageFont.truetype("arial.ttf", font_size)
-            except (OSError, IOError):
-                font = ImageFont.load_default()
+        font = self.load_best_font(font_size, bold=bold)
         temp_img = Image.new("RGBA", (1, 1), (0, 0, 0, 0))
         temp_draw = ImageDraw.Draw(temp_img)
         words = text.split()
@@ -118,6 +142,7 @@ class VideoMontageMaker:
 
         draw = ImageDraw.Draw(img)
         y_offset = 20
+        shadow_offset = max(2, font_size // 30)
         for line in lines:
             bbox = draw.textbbox((0, 0), line, font=font)
             line_width = bbox[2] - bbox[0]
@@ -129,6 +154,8 @@ class VideoMontageMaker:
             else:
                 x_offset = 20
 
+            if shadow:
+                draw.text((x_offset + shadow_offset, y_offset + shadow_offset), line, font=font, fill=(0, 0, 0, 160))
             draw.text((x_offset, y_offset), line, font=font, fill=color)
             y_offset += line_height
 
@@ -141,6 +168,7 @@ class VideoMontageMaker:
             font_size=80,
             color=(255, 255, 255),
             max_width=self.video_size[0] - 200,
+            bold=True,
         )
         
         title_clip = ImageClip(title_img, duration=duration).with_position("center")
@@ -169,6 +197,7 @@ class VideoMontageMaker:
             font_size=90,
             color=(255, 215, 0),
             max_width=self.video_size[0] - 200,
+            bold=True,
         )
 
         main_title = ImageClip(main_title_img, duration=duration).with_position(
@@ -180,6 +209,7 @@ class VideoMontageMaker:
             font_size=50,
             color=(255, 255, 255),
             max_width=self.video_size[0] - 400,
+            bold=True,
         )
 
         sub_title = ImageClip(sub_title_img, duration=duration).with_position(
@@ -208,10 +238,11 @@ class VideoMontageMaker:
         duration = end_time - start_time
         subtitle_img = self.create_text_image(
             text.upper(),
-            font_size=65,
+            font_size=60,
             color=(255, 255, 255),
             bg_color=None,
             max_width=video_size[0] - 300,
+            bold=True,
         )
 
         txt_clip = (
