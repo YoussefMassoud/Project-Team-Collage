@@ -46,11 +46,7 @@ export default function Report() {
         <motion.div
           className="glass-panel"
           style={{
-            padding: "20px",
-            aspectRatio: ready ? "16/9" : "auto",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
+            padding: ready ? 0 : "20px",
             background: "#000",
             position: "relative",
             overflow: "hidden",
