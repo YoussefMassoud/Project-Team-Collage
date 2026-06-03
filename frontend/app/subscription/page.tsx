@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Check, MousePointerClick, FileText, MessageCircle, Trophy } from 'lucide-react';
 import SubscriptionDialog from '@/components/SubscriptionDialog';
 

@@ -15,12 +15,6 @@ interface SentimentChartProps {
 }
 
 export default function SentimentChart({ data }: SentimentChartProps) {
-  const createGradient = (ctx: CanvasRenderingContext2D, color1: string, color2: string) => {
-    const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-    gradient.addColorStop(0, color1);
-    gradient.addColorStop(1, color2);
-    return gradient;
-  };
 
   const chartData: ChartData<'doughnut'> = {
     labels: ['😊 Positive', '😢 Negative', '😐 Neutral'],

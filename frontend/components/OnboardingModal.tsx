@@ -1,19 +1,15 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
     X, 
     Sparkles, 
     Link as LinkIcon, 
-    BarChart3, 
     Video, 
     CheckCircle2, 
     ArrowRight,
-    Search,
     PieChart,
-    Smile,
-    FastForward
-} from 'lucide-react';
+    Smile} from 'lucide-react';
 
 export default function OnboardingModal() {
     const [isVisible, setIsVisible] = useState(false);

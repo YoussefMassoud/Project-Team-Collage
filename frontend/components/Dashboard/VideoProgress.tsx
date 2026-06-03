@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
 import { motion } from "framer-motion";
-import { Loader2, MonitorPlay, CheckCircle2, AlertCircle } from "lucide-react";
+import { Loader2, CheckCircle2 } from "lucide-react";
 import { checkVideoProgress } from "@/api";
 
 interface ProgressData {

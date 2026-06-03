@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Play, FileAudio, Loader2, CheckCircle2, Eye } from "lucide-react";
+import { FileAudio, Loader2, CheckCircle2 } from "lucide-react";
 import { checkVideoStatus, checkVideoProgress } from "@/api";
 import VideoPlayer from "@/components/VideoPlayer";
 

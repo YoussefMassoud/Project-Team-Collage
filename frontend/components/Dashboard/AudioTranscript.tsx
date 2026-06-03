@@ -1,6 +1,5 @@
 "use client";
 import { useState, useRef, useCallback, useEffect } from "react";
-import { motion } from "framer-motion";
 
 interface AudioTranscriptProps {
   issues: string[];
