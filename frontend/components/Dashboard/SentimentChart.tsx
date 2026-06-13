@@ -16,6 +16,8 @@ interface SentimentChartProps {
 
 export default function SentimentChart({ data }: SentimentChartProps) {
 
+  if (!data) return null;
+
   const chartData: ChartData<'doughnut'> = {
     labels: ['😊 Positive', '😢 Negative', '😐 Neutral'],
     datasets: [

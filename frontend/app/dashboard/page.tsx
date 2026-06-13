@@ -199,22 +199,24 @@ export default function Dashboard() {
           </motion.div>
         </div>
 
-        <motion.div className="glass-panel" style={{ padding: "25px", flex: 1 }} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-          <h3 style={{ marginTop: 0, color: "#aaa", marginBottom: "20px" }}>Audience Sentiment</h3>
-          <SentimentChart data={analysis.comment_analysis} />
-          <div style={{ marginTop: "20px", textAlign: "center" }}>
-            <p style={{ fontSize: "0.9rem", color: "#888" }}>Overall Tone</p>
-            <p
-              style={{
-                fontSize: "1.5rem",
-                fontWeight: "bold",
-                color: analysis.sentiment === "Positive" ? "#22c55e" : analysis.sentiment === "Negative" ? "#ef4444" : "#94a3b8",
-              }}
-            >
-              {analysis.sentiment}
-            </p>
-          </div>
-        </motion.div>
+        {analysis.comment_analysis && (
+          <motion.div className="glass-panel" style={{ padding: "25px", flex: 1 }} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
+            <h3 style={{ marginTop: 0, color: "#aaa", marginBottom: "20px" }}>Audience Sentiment</h3>
+            <SentimentChart data={analysis.comment_analysis} />
+            <div style={{ marginTop: "20px", textAlign: "center" }}>
+              <p style={{ fontSize: "0.9rem", color: "#888" }}>Overall Tone</p>
+              <p
+                style={{
+                  fontSize: "1.5rem",
+                  fontWeight: "bold",
+                  color: analysis.sentiment === "Positive" ? "#22c55e" : analysis.sentiment === "Negative" ? "#ef4444" : "#94a3b8",
+                }}
+              >
+                {analysis.sentiment}
+              </p>
+            </div>
+          </motion.div>
+        )}
       </div>
     </div>
   );

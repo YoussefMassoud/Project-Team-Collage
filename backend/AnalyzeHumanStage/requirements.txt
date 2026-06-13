@@ -1,4 +1,4 @@
 Flask
 gTTS
-google-generativeai
+groq
 python-dotenv

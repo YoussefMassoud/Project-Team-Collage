@@ -32,6 +32,77 @@ video_progress = {
     "total_stages": 5
 }
 
+def quick_analyze(data):
+    """Rule-based structured analysis from JSON data — no AI needed."""
+    comments = data.get("comments", [])
+    engagement = data.get("engagement", {})
+    post = data.get("post_content", "")
+
+    price_kw = ["بكام", "سعر", "كام", "تمن", "بتاخد", "بياخد"]
+    positive_kw = ["ممتاز", "رائع", "جميل", "تسلم", "يسلمو", "شكرا", "شكرًا", "تمام", "حلو", "احسن", "بحب", "عظيم"]
+    negative_kw = ["وحش", "سيء", "غالي", "غلاء", "مش كويس", "زهقت", "بطيء"]
+
+    pos, neg, neu = 0, 0, 0
+    for c in comments:
+        text = c.get("comment", "")
+        if any(k in text for k in positive_kw):
+            pos += 1
+        elif any(k in text for k in negative_kw):
+            neg += 1
+        else:
+            neu += 1
+
+    # Scale sample to total comment count
+    total = engagement.get("comments", len(comments))
+    sample = max(len(comments), 1)
+    scale = total / sample
+    pos = round(pos * scale)
+    neg = round(neg * scale)
+    neu = total - pos - neg
+
+    issues = []
+    no_price = any(any(k in c.get("comment", "") for k in price_kw) for c in comments)
+    has_dm = any(
+        any("تم التوصل" in r.get("reply", "") or "رسائل الصفحه" in r.get("reply", "")
+            for r in c.get("replies", []))
+        for c in comments
+    )
+    if no_price:
+        pct = round(neu / total * 100) if total else 0
+        issues.append(f"السعر غير مذكور - ~{pct}% من التعليقات تسأل عن السعر")
+    if has_dm:
+        issues.append("الرد بـ'تم التوصل' يُخفي السعر عن الجمهور ويُقلل التحويل")
+    if engagement.get("shares", 0) < 5:
+        issues.append("معدل المشاركة منخفض جداً مقارنة بحجم التعليقات")
+
+    suggestions = [
+        "أضف السعر مباشرةً في البوست أو في أول تعليق مثبّت",
+        "استبدل 'تم التوصل' بالسعر في ردودك العامة لتحفيز الشراء الفوري",
+        "أضف CTA واضح مثل 'اطلب الآن على واتساب: [رقم]'",
+        "أنشئ Story تكشف فيه السعر لجذب مشاركات أكثر",
+    ]
+
+    topics = []
+    if "تشيكن" in post or "فرايد" in post:
+        topics.append("Fried Chicken")
+    if "عرض" in post:
+        topics.append("Offer")
+    if "كول سلو" in post:
+        topics.append("Coleslaw")
+    if not topics:
+        topics = ["Food", "Offer"]
+
+    sentiment = "Neutral" if neu >= (pos + neg) else ("Positive" if pos > neg else "Negative")
+
+    return {
+        "issues": issues,
+        "suggestions": suggestions,
+        "comment_analysis": {"Positive": pos, "Negative": neg, "Neutral": neu},
+        "sentiment": sentiment,
+        "topics": topics,
+        "video_ready": False,
+    }
+
 BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def run_stage(folder_name, script_name, ignore_failure=False, extra_args=None):
@@ -231,56 +302,12 @@ def run_all_flow():
                 f.write(fallback_text)
 
         threading.Thread(target=process_video_background, args=(analyze_output, audio_dir, video_dir)).start()
-        
-        analysis_result = {
-            "topics": ["Customer Service", "Pricing", "Discount"],
-            "pros": [
-                "Strong community engagement",
-                "High visual appeal of food",
-                "Fast response to positive feedback"
-            ],
-            "cons": [
-                "Missing price information",
-                "High customer frustration in comments",
-                "Repetitive automated replies"
-            ],
-            "issues": [
-                "No price listed created major friction",
-                "Over 1000 comments asking 'how much?'",
-                "Generic replies provided zero value"
-            ],
-            "suggestions": [
-                "Always include price in the post",
-                "Replace vague replies with clear answers",
-                "Add clear call to action for conversions"
-            ],
-            "comment_analysis": {
-                "Positive": 15,
-                "Negative": 70,
-                "Neutral": 15
-            },
-            "sentiment": "Negative",
-            "video_ready": False 
-        }
-        
-        print("\n" + "╔" + "═"*58 + "╗")
-        print("║" + " ANALYSIS COMPLETE ".center(58) + "║")
-        print("╚" + "═"*58 + "╝")
-        
-        print(f"\n[AI] Topics: {', '.join(analysis_result['topics'])}")
-        
-        print("\n[PROS]")
-        for pro in analysis_result["pros"]:
-            print(f"  + {pro}")
-            
-        print("\n[CONS]")
-        for con in analysis_result["cons"]:
-            print(f"  - {con}")
-            
-        print(f"\n[SENTIMENT] {analysis_result['sentiment']}")
-        print("\n" + "═"*60 + "\n")
-        
-        return jsonify(analysis_result), 200
+
+        with open(dest_json, 'r', encoding='utf-8') as f:
+            post_data = json.load(f)
+        analysis = quick_analyze(post_data)
+        analysis["message"] = "Analysis started"
+        return jsonify(analysis), 200
 
     except Exception as e:
         print(f"Error in fast-path: {e}", flush=True)
