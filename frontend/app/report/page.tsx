@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { FileAudio, Loader2, CheckCircle2 } from "lucide-react";
 import { checkVideoStatus, checkVideoProgress } from "@/api";
 import VideoPlayer from "@/components/VideoPlayer";
+import VideoLoadingPlayer from "@/components/VideoLoadingPlayer";
 
 export default function Report() {
   const [ready, setReady] = useState(false);
@@ -46,54 +47,18 @@ export default function Report() {
         <motion.div
           className="glass-panel"
           style={{
-            padding: ready ? 0 : "20px",
+            padding: 0,
             background: "#000",
             position: "relative",
             overflow: "hidden",
-            minHeight: ready ? "auto" : "350px",
           }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
         >
           {ready ? (
             <VideoPlayer src="http://localhost:5001/api/video" />
-          ) : generating ? (
-            <div style={{ width: "100%", padding: "30px" }}>
-              <div style={{ textAlign: "center", marginBottom: "25px" }}>
-                <Loader2 className="animate-spin" size={48} color="var(--accent)" />
-                <p style={{ margin: "15px 0 5px", fontWeight: 600, fontSize: "1.1rem" }}>Generating AI Video</p>
-                <p style={{ margin: 0, fontSize: "0.85rem", opacity: 0.5, textTransform: "capitalize" }}>{progress.stage}</p>
-              </div>
-
-              {/* Progress bar */}
-              <div style={{ height: "8px", borderRadius: "4px", background: "rgba(255,255,255,0.1)", overflow: "hidden", marginBottom: "12px" }}>
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${Math.min(progress.percent, 100)}%` }}
-                  transition={{ duration: 0.4, ease: "easeOut" }}
-                  style={{
-                    height: "100%",
-                    borderRadius: "4px",
-                    background: "linear-gradient(90deg, var(--accent), #06b6d4)",
-                  }}
-                />
-              </div>
-
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", opacity: 0.5 }}>
-                <span>{progress.percent.toFixed(1)}%</span>
-                <span>{progress.elapsed}s elapsed</span>
-                {progress.total_frames > 0 && (
-                  <span>
-                    {progress.frame}/{progress.total_frames} frames
-                  </span>
-                )}
-              </div>
-            </div>
           ) : (
-            <div style={{ textAlign: "center" }}>
-              <p style={{ opacity: 0.5 }}>No video being generated</p>
-              <a href="/" style={{ color: "var(--accent)" }}>Analyze a post first</a>
-            </div>
+            <VideoLoadingPlayer stage={generating ? progress.stage : "starting"} />
           )}
         </motion.div>
 
@@ -128,26 +93,11 @@ export default function Report() {
           ) : (
             <div>
               <p style={{ lineHeight: "1.8", color: "#ccc" }}>
-                Your video is being assembled. This usually takes 2-5 minutes depending on the content length. Stay on this page or come back later.
+                Your video is being assembled. This usually takes 2–5 minutes. Stay on this page or come back later.
               </p>
-              <div style={{ marginTop: "20px", padding: "16px", borderRadius: "10px", background: "rgba(255,255,255,0.03)", border: "1px solid var(--card-border)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", marginBottom: "6px" }}>
-                  <span style={{ opacity: 0.6 }}>Progress</span>
-                  <span style={{ opacity: 0.6 }}>{progress.percent.toFixed(0)}%</span>
-                </div>
-                <div style={{ height: "4px", borderRadius: "2px", background: "rgba(255,255,255,0.1)", overflow: "hidden" }}>
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${Math.min(progress.percent, 100)}%` }}
-                    transition={{ duration: 0.5, ease: "easeOut" }}
-                    style={{ height: "100%", borderRadius: "2px", background: "var(--accent)" }}
-                  />
-                </div>
-                <div style={{ marginTop: "12px", display: "flex", gap: "16px", fontSize: "0.8rem", opacity: 0.5 }}>
-                  <span>Stage: {progress.stage}</span>
-                  <span>Elapsed: {progress.elapsed}s</span>
-                </div>
-              </div>
+              <p style={{ marginTop: "16px", fontSize: "0.85rem", color: "var(--accent)", textTransform: "capitalize", opacity: 0.8 }}>
+                {progress.stage || "Starting…"}
+              </p>
             </div>
           )}
         </motion.div>

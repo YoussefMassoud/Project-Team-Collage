@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { fetchPost, analyzePost } from '@/api';
 import { Search, Loader2 } from 'lucide-react';
 import OnboardingModal from '@/components/OnboardingModal';
+import VideoLoadingOverlay from '@/components/VideoLoadingOverlay';
 
 export default function Home() {
   const [url, setUrl] = useState('');
@@ -47,6 +48,7 @@ export default function Home() {
 
   return (
     <div className="container flex-center" style={{ minHeight: '80vh', flexDirection: 'column', textAlign: 'center' }}>
+      <VideoLoadingOverlay stage={loadingStage} visible={!!loadingStage} />
       <OnboardingModal />
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -89,16 +91,6 @@ export default function Home() {
           {loadingStage ? <Loader2 className="animate-spin" /> : 'Analyze Now'}
         </button>
       </motion.div>
-
-      {loadingStage && (
-        <motion.p 
-          initial={{ opacity: 0 }} 
-          animate={{ opacity: 1 }} 
-          style={{ marginTop: '15px', color: '#22d3ee', fontWeight: '500' }}
-        >
-          {loadingStage}
-        </motion.p>
-      )}
 
       <div style={{ marginTop: '60px', display: 'flex', gap: '40px', opacity: 0.5 }}>
         <span>Facebook</span>
